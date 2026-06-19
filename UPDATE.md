@@ -2,6 +2,14 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.10
+- Added: **Offline cache** (Settings) — toggle to save songs to disk as you play
+  them, plus "Cache all" to download your whole library for offline play, and
+  Clear. Plays from disk when cached.
+- Fixed: the **Download button now reports why it failed** instead of a silent
+  "Download failed" (usually: log into Suno via Explore so private songs can be
+  fetched).
+
 ## 2026-06-19 — v1.3.9
 - Added: **3-band Equalizer + presets** in Settings (Bass/Mid/Treble, -12..+12 dB;
   Flat, Bass boost, Vocal, Treble, Warm, Lo-fi). The visualizer reflects it since

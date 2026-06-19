@@ -122,9 +122,11 @@ function App() {
   const [actionsOpen, setActionsOpen] = useState(false);           // library: import/backup/restore dropdown
   const [bigViz, setBigViz] = useState(false);                     // now-playing: hide art, enlarge visualizer
   const [search, setSearch] = useState('');                        // library: realtime song search
-  const [settings, setSettings] = useState({ effects: 1, remember: true, sort: 'added-desc', favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 } });
+  const [settings, setSettings] = useState({ effects: 1, remember: true, sort: 'added-desc', favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, offline: false });
   const [showSettings, setShowSettings] = useState(false);
   const [favOnly, setFavOnly] = useState(false);
+  const [offlineCount, setOfflineCount] = useState(0);
+  const [caching, setCaching] = useState(false);
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -148,11 +150,26 @@ function App() {
   };
   const toggleFav = (id) => { const s = new Set(settingsRef.current.favorites || []); s.has(id) ? s.delete(id) : s.add(id); updateSettings({ favorites: [...s] }); };
   const favSet = new Set(settings.favorites || []);
+
+  /* ---- offline cache ---- */
+  const refreshOffline = async () => { try { const l = api.offlineList && await api.offlineList(); setOfflineCount(Array.isArray(l) ? l.length : 0); } catch {} };
+  useEffect(() => { refreshOffline(); }, []);
+  const cacheAll = async () => {
+    if (caching) return; setCaching(true);
+    const items = tracks.filter((t) => t.audioUrl); let ok = 0, fail = 0;
+    for (let i = 0; i < items.length; i++) {
+      flash('Caching ' + (i + 1) + '/' + items.length + '…');
+      try { const r = await api.offlineSaveUrl(items[i].id, items[i].audioUrl); (r && r.ok) ? ok++ : fail++; } catch { fail++; }
+    }
+    setCaching(false); refreshOffline();
+    flash(fail ? ('Cached ' + ok + ', ' + fail + ' failed — log into Suno via Explore for private songs.') : ('All ' + ok + ' songs cached offline 💾'), fail && ok === 0);
+  };
+  const clearCache = async () => { try { await api.offlineClear(); urlCache.current.clear(); refreshOffline(); flash('Offline cache cleared'); } catch {} };
   useEffect(() => {
     (async () => {
       try {
         const s = (api.getSettings && await api.getSettings()) || {};
-        const merged = { effects: 1, remember: true, sort: 'added-desc', favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, ...s };
+        const merged = { effects: 1, remember: true, sort: 'added-desc', favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, offline: false, ...s };
         settingsRef.current = merged; setSettings(merged);
         document.documentElement.style.setProperty('--fx', String(merged.effects));
         if (merged.remember && merged.session) {
@@ -257,8 +274,14 @@ function App() {
     if (urlCache.current.has(track.id)) return urlCache.current.get(track.id);
     let bytes;
     if (track.bytes) bytes = track.bytes;
-    else if (track.audioUrl) bytes = (await api.fetchSunoUrl(track.audioUrl)).bytes;
-    else throw new Error('No audio source for this track.');
+    else {
+      try { const off = api.offlineGet && await api.offlineGet(track.id); if (off && off.bytes) bytes = off.bytes; } catch {}   // play from cache if saved
+      if (!bytes) {
+        if (!track.audioUrl) throw new Error('No audio source for this track.');
+        bytes = (await api.fetchSunoUrl(track.audioUrl)).bytes;
+        if (settingsRef.current.offline && api.offlineSave) { try { await api.offlineSave(track.id, bytes); refreshOffline(); } catch {} }   // auto-cache
+      }
+    }
     const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
     urlCache.current.set(track.id, url); return url;
   }, []);
@@ -351,7 +374,7 @@ function App() {
   useEffect(() => { const close = () => { setCtx(null); setPlMenuOpen(false); }; addEventListener('click', close); return () => removeEventListener('click', close); }, []);
 
   const toggleSel = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : s.concat(id));
-  const downloadSel = async () => { const r = await api.downloadTracks(selected); if (r.canceled) return; flash(r.ok ? ('Downloaded ' + r.count + ' song' + (r.count > 1 ? 's' : '') + ' 💾') : (r.message || 'Download failed.'), !r.ok); };
+  const downloadSel = async () => { const r = await api.downloadTracks(selected); if (r.canceled) return; flash(r.message || (r.ok ? ('Downloaded ' + r.count + ' song' + (r.count > 1 ? 's' : '') + ' 💾') : 'Download failed.'), !r.ok); };
   const removeSel = () => { selected.forEach((id) => api.removeTrack(id)); flash('Removed ' + selected.length + ' from library'); setSelected([]); };
   const moveSel = (pid, name) => { selected.forEach((id) => api.addToPlaylist(pid, id)); flash('Moved ' + selected.length + ' to ' + name + ' 💜'); setSelected([]); setPlMenuOpen(false); };
 
@@ -603,6 +626,15 @@ function App() {
             <div className="set-row">
               <div className="set-label"><div className="set-title">Remember settings</div><div className="set-sub">restore volume, shuffle, repeat & tab on launch</div></div>
               <button className={'toggle' + (settings.remember ? ' on' : '')} onClick={() => updateSettings({ remember: !settings.remember })}>{settings.remember ? 'On' : 'Off'}</button>
+            </div>
+            <div className="set-row">
+              <div className="set-label"><div className="set-title">Offline cache</div><div className="set-sub">save songs to disk as you play them — {offlineCount} cached</div></div>
+              <button className={'toggle' + (settings.offline ? ' on' : '')} onClick={() => updateSettings({ offline: !settings.offline })}>{settings.offline ? 'On' : 'Off'}</button>
+            </div>
+            <div className="set-row">
+              <div className="set-label"><div className="set-title">Offline library</div><div className="set-sub">download every song so it plays with no internet</div></div>
+              <button className="set-btn" disabled={caching || !tracks.length} onClick={cacheAll}>{caching ? 'Caching…' : 'Cache all'}</button>
+              <button className="set-btn danger" disabled={caching || !offlineCount} onClick={clearCache}>Clear</button>
             </div>
             <div className="set-eq">
               <div className="set-label"><div className="set-title">Equalizer</div><div className="set-sub">shapes the sound (and the visualizer follows it)</div></div>

@@ -1120,9 +1120,11 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const [actionsOpen, setActionsOpen] = useState2(false);
     const [bigViz, setBigViz] = useState2(false);
     const [search, setSearch] = useState2("");
-    const [settings, setSettings] = useState2({ effects: 1, remember: true, sort: "added-desc", favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 } });
+    const [settings, setSettings] = useState2({ effects: 1, remember: true, sort: "added-desc", favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, offline: false });
     const [showSettings, setShowSettings] = useState2(false);
     const [favOnly, setFavOnly] = useState2(false);
+    const [offlineCount, setOfflineCount] = useState2(0);
+    const [caching, setCaching] = useState2(false);
     const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
     const urlCache = useRef(/* @__PURE__ */ new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
     const audioCtxRef = useRef(null), analyserRef = useRef(null), eqRef = useRef(null);
@@ -1159,11 +1161,48 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
       updateSettings({ favorites: [...s] });
     };
     const favSet = new Set(settings.favorites || []);
+    const refreshOffline = async () => {
+      try {
+        const l = api2.offlineList && await api2.offlineList();
+        setOfflineCount(Array.isArray(l) ? l.length : 0);
+      } catch {
+      }
+    };
+    useEffect2(() => {
+      refreshOffline();
+    }, []);
+    const cacheAll = async () => {
+      if (caching) return;
+      setCaching(true);
+      const items = tracks.filter((t) => t.audioUrl);
+      let ok = 0, fail = 0;
+      for (let i = 0; i < items.length; i++) {
+        flash("Caching " + (i + 1) + "/" + items.length + "\u2026");
+        try {
+          const r = await api2.offlineSaveUrl(items[i].id, items[i].audioUrl);
+          r && r.ok ? ok++ : fail++;
+        } catch {
+          fail++;
+        }
+      }
+      setCaching(false);
+      refreshOffline();
+      flash(fail ? "Cached " + ok + ", " + fail + " failed \u2014 log into Suno via Explore for private songs." : "All " + ok + " songs cached offline \u{1F4BE}", fail && ok === 0);
+    };
+    const clearCache = async () => {
+      try {
+        await api2.offlineClear();
+        urlCache.current.clear();
+        refreshOffline();
+        flash("Offline cache cleared");
+      } catch {
+      }
+    };
     useEffect2(() => {
       (async () => {
         try {
           const s = api2.getSettings && await api2.getSettings() || {};
-          const merged = { effects: 1, remember: true, sort: "added-desc", favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, ...s };
+          const merged = { effects: 1, remember: true, sort: "added-desc", favorites: [], playStats: {}, eq: { low: 0, mid: 0, high: 0 }, offline: false, ...s };
           settingsRef.current = merged;
           setSettings(merged);
           document.documentElement.style.setProperty("--fx", String(merged.effects));
@@ -1308,8 +1347,24 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
       if (urlCache.current.has(track.id)) return urlCache.current.get(track.id);
       let bytes;
       if (track.bytes) bytes = track.bytes;
-      else if (track.audioUrl) bytes = (await api2.fetchSunoUrl(track.audioUrl)).bytes;
-      else throw new Error("No audio source for this track.");
+      else {
+        try {
+          const off = api2.offlineGet && await api2.offlineGet(track.id);
+          if (off && off.bytes) bytes = off.bytes;
+        } catch {
+        }
+        if (!bytes) {
+          if (!track.audioUrl) throw new Error("No audio source for this track.");
+          bytes = (await api2.fetchSunoUrl(track.audioUrl)).bytes;
+          if (settingsRef.current.offline && api2.offlineSave) {
+            try {
+              await api2.offlineSave(track.id, bytes);
+              refreshOffline();
+            } catch {
+            }
+          }
+        }
+      }
       const url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
       urlCache.current.set(track.id, url);
       return url;
@@ -1537,7 +1592,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const downloadSel = async () => {
       const r = await api2.downloadTracks(selected);
       if (r.canceled) return;
-      flash(r.ok ? "Downloaded " + r.count + " song" + (r.count > 1 ? "s" : "") + " \u{1F4BE}" : r.message || "Download failed.", !r.ok);
+      flash(r.message || (r.ok ? "Downloaded " + r.count + " song" + (r.count > 1 ? "s" : "") + " \u{1F4BE}" : "Download failed."), !r.ok);
     };
     const removeSel = () => {
       selected.forEach((id) => api2.removeTrack(id));
@@ -1677,7 +1732,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     } }, "\u2796 Remove from this list"), /* @__PURE__ */ React.createElement("button", { className: "ctx-item danger", onClick: () => {
       api2.removeTrack(ctx.track.id);
       setCtx(null);
-    } }, "\u{1F5D1} Remove from library")), showSettings && /* @__PURE__ */ React.createElement("div", { className: "modal-bg", onClick: () => setShowSettings(false) }, /* @__PURE__ */ React.createElement("div", { className: "modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "modal-head" }, /* @__PURE__ */ React.createElement("span", null, "\u2699 Settings"), /* @__PURE__ */ React.createElement("button", { className: "modal-x", title: "Close", onClick: () => setShowSettings(false) }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Effects intensity"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "particles, trails & the audio pulse")), /* @__PURE__ */ React.createElement("input", { className: "set-range", type: "range", min: "0", max: "1", step: "0.05", value: settings.effects, onChange: (e) => updateSettings({ effects: parseFloat(e.target.value) }) }), /* @__PURE__ */ React.createElement("span", { className: "set-val" }, Math.round(settings.effects * 100), "%")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Remember settings"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "restore volume, shuffle, repeat & tab on launch")), /* @__PURE__ */ React.createElement("button", { className: "toggle" + (settings.remember ? " on" : ""), onClick: () => updateSettings({ remember: !settings.remember }) }, settings.remember ? "On" : "Off")), /* @__PURE__ */ React.createElement("div", { className: "set-eq" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Equalizer"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "shapes the sound (and the visualizer follows it)")), /* @__PURE__ */ React.createElement("div", { className: "eq-presets" }, Object.keys(EQ_PRESETS).map((name) => /* @__PURE__ */ React.createElement("button", { key: name, className: "eq-preset", onClick: () => updateSettings({ eq: EQ_PRESETS[name] }) }, name))), /* @__PURE__ */ React.createElement("div", { className: "eq-bands" }, EQ_BANDS.map(([k, label]) => {
+    } }, "\u{1F5D1} Remove from library")), showSettings && /* @__PURE__ */ React.createElement("div", { className: "modal-bg", onClick: () => setShowSettings(false) }, /* @__PURE__ */ React.createElement("div", { className: "modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "modal-head" }, /* @__PURE__ */ React.createElement("span", null, "\u2699 Settings"), /* @__PURE__ */ React.createElement("button", { className: "modal-x", title: "Close", onClick: () => setShowSettings(false) }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Effects intensity"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "particles, trails & the audio pulse")), /* @__PURE__ */ React.createElement("input", { className: "set-range", type: "range", min: "0", max: "1", step: "0.05", value: settings.effects, onChange: (e) => updateSettings({ effects: parseFloat(e.target.value) }) }), /* @__PURE__ */ React.createElement("span", { className: "set-val" }, Math.round(settings.effects * 100), "%")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Remember settings"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "restore volume, shuffle, repeat & tab on launch")), /* @__PURE__ */ React.createElement("button", { className: "toggle" + (settings.remember ? " on" : ""), onClick: () => updateSettings({ remember: !settings.remember }) }, settings.remember ? "On" : "Off")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Offline cache"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "save songs to disk as you play them \u2014 ", offlineCount, " cached")), /* @__PURE__ */ React.createElement("button", { className: "toggle" + (settings.offline ? " on" : ""), onClick: () => updateSettings({ offline: !settings.offline }) }, settings.offline ? "On" : "Off")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Offline library"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "download every song so it plays with no internet")), /* @__PURE__ */ React.createElement("button", { className: "set-btn", disabled: caching || !tracks.length, onClick: cacheAll }, caching ? "Caching\u2026" : "Cache all"), /* @__PURE__ */ React.createElement("button", { className: "set-btn danger", disabled: caching || !offlineCount, onClick: clearCache }, "Clear")), /* @__PURE__ */ React.createElement("div", { className: "set-eq" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Equalizer"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "shapes the sound (and the visualizer follows it)")), /* @__PURE__ */ React.createElement("div", { className: "eq-presets" }, Object.keys(EQ_PRESETS).map((name) => /* @__PURE__ */ React.createElement("button", { key: name, className: "eq-preset", onClick: () => updateSettings({ eq: EQ_PRESETS[name] }) }, name))), /* @__PURE__ */ React.createElement("div", { className: "eq-bands" }, EQ_BANDS.map(([k, label]) => {
       const val = (settings.eq || {})[k] || 0;
       return /* @__PURE__ */ React.createElement("div", { key: k, className: "eq-band" }, /* @__PURE__ */ React.createElement("span", { className: "eq-band-label" }, label), /* @__PURE__ */ React.createElement(
         "input",

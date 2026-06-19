@@ -249,7 +249,7 @@ ipcMain.handle('tracks:download', async (_e, ids) => {
   if (!picks.length) return { ok: false, message: 'Those songs have no downloadable audio.' };
   const res = await dialog.showOpenDialog(mainWindow, { title: 'Choose a download folder', properties: ['openDirectory', 'createDirectory'] });
   if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
-  const dir = res.filePaths[0]; let n = 0;
+  const dir = res.filePaths[0]; let n = 0, fail = 0, lastErr = '';
   for (const t of picks) {
     try {
       const buf = await sunoFetchBuffer(t.audioUrl);
@@ -257,10 +257,30 @@ ipcMain.handle('tracks:download', async (_e, ids) => {
       let file = path.join(dir, base + '.mp3'); let i = 1;
       while (fs.existsSync(file)) file = path.join(dir, base + ' (' + (i++) + ').mp3');
       fs.writeFileSync(file, buf); n++;
-    } catch {}
+    } catch (e) { fail++; lastErr = e.message || 'fetch failed'; }
   }
-  return { ok: n > 0, count: n, dir };
+  let message;
+  if (n === 0) message = 'Suno blocked the audio (' + lastErr + '). Open Explore and sign into Suno once so the app can authorize, then try again.';
+  else if (fail) message = 'Downloaded ' + n + ', but ' + fail + ' couldn\'t be fetched (' + lastErr + ').';
+  return { ok: n > 0, count: n, failed: fail, dir, message };
 });
+
+/* ===================== offline cache (play from disk, works offline) ===================== */
+function offlineDir() { const d = path.join(app.getPath('userData'), 'offline'); try { fs.mkdirSync(d, { recursive: true }); } catch {} return d; }
+function offlineFile(id) { return path.join(offlineDir(), String(id).replace(/[^a-z0-9_-]/gi, '_') + '.mp3'); }
+ipcMain.handle('offline:get', (_e, id) => {
+  try { const f = offlineFile(id); if (fs.existsSync(f)) { const b = fs.readFileSync(f); return { bytes: b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; } } catch {}
+  return { bytes: null };
+});
+ipcMain.handle('offline:save', (_e, id, arrbuf) => {
+  try { fs.writeFileSync(offlineFile(id), Buffer.from(arrbuf)); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('offline:saveUrl', async (_e, id, url) => {
+  try { const f = offlineFile(id); if (fs.existsSync(f)) return { ok: true, cached: true }; const buf = await sunoFetchBuffer(url); fs.writeFileSync(f, buf); return { ok: true }; }
+  catch (e) { return { ok: false, error: e.message }; }
+});
+ipcMain.handle('offline:list', () => { try { return fs.readdirSync(offlineDir()).filter((f) => f.endsWith('.mp3')); } catch { return []; } });
+ipcMain.handle('offline:clear', () => { try { const d = offlineDir(); for (const f of fs.readdirSync(d)) if (f.endsWith('.mp3')) fs.unlinkSync(path.join(d, f)); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; } });
 
 /* ===================== embedded Suno: capture auth token for private audio ===================== */
 const attached = new Set();

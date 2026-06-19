@@ -37,6 +37,13 @@ contextBridge.exposeInMainWorld('kawaii', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 
+  // offline cache
+  offlineGet: (id) => ipcRenderer.invoke('offline:get', id),
+  offlineSave: (id, bytes) => ipcRenderer.invoke('offline:save', id, bytes),
+  offlineSaveUrl: (id, url) => ipcRenderer.invoke('offline:saveUrl', id, url),
+  offlineList: () => ipcRenderer.invoke('offline:list'),
+  offlineClear: () => ipcRenderer.invoke('offline:clear'),
+
   // deepseek (Creation tab)
   deepseek: (payload) => ipcRenderer.invoke('deepseek:chat', payload),
   getDsKey: () => ipcRenderer.invoke('deepseek:getKey'),
