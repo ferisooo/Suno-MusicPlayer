@@ -30,10 +30,6 @@ contextBridge.exposeInMainWorld('kawaii', {
   loadSuno: (input) => ipcRenderer.invoke('suno:load', input),
   attachSuno: (wcId) => ipcRenderer.invoke('suno:attach', wcId),
   fetchSunoUrl: (url) => ipcRenderer.invoke('suno:fetchUrl', url),
-  importVisible: (playlistId) => ipcRenderer.invoke('suno:importVisible', playlistId),
-  chromeLogin: () => ipcRenderer.invoke('suno:chromeLogin'),
-  onSunoPage: (cb) => ipcRenderer.on('suno:page', (_e, p) => cb(p)),
-  onSunoPlayed: (cb) => ipcRenderer.on('suno:played', (_e, p) => cb(p)),
   exportLibrary: () => ipcRenderer.invoke('config:export'),
   importLibrary: () => ipcRenderer.invoke('config:import'),
 

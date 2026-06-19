@@ -130,11 +130,8 @@
     const [embedded, setEmbedded] = useState(false);
     const [sunoStart, setSunoStart] = useState("https://suno.com/me");
     const [ctx, setCtx] = useState(null);
-    const [pageTracks, setPageTracks] = useState([]);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState("");
-    const [played, setPlayed] = useState({});
-    const [onlyPlayed, setOnlyPlayed] = useState(false);
     const [selected, setSelected] = useState([]);
     const [plMenuOpen, setPlMenuOpen] = useState(false);
     const [picking, setPicking] = useState(false);
@@ -168,8 +165,6 @@
         setPlaylists(s.playlists || []);
       });
       api.onToast && api.onToast(({ msg, err }) => flash(msg, err));
-      api.onSunoPage && api.onSunoPage(({ tracks: pt }) => setPageTracks(pt || []));
-      api.onSunoPlayed && api.onSunoPlayed(({ id }) => setPlayed((p) => ({ ...p, [id]: true })));
     }, []);
     useEffect(() => {
       const a = new Audio();
@@ -375,30 +370,7 @@
       setSunoStart("https://suno.com/me");
       setTab("explore");
       navSuno("https://suno.com/me");
-      flash("Open a playlist, then right-click songs (or \u2B07 import all) \u{1F380}");
-    };
-    const connect = () => {
-      setEmbedded(true);
-      setSunoStart("https://suno.com/me");
-      setTab("explore");
-      navSuno("https://suno.com/me");
-      flash("Log into Suno below \u2014 it's remembered after \u{1F511}");
-    };
-    const chromeLogin = async () => {
-      setBusy(true);
-      flash("Trying to import your Chrome login\u2026 \u{1F511}");
-      try {
-        const r = await api.chromeLogin();
-        flash(r.ok ? "Imported " + r.count + " cookies \u2014 you should be logged in \u{1F49C}" : r.message, !r.ok);
-        if (r.ok) {
-          setEmbedded(true);
-          setTab("explore");
-        }
-      } catch (e) {
-        flash("Chrome import failed.", true);
-      } finally {
-        setBusy(false);
-      }
+      flash("Open your songs, hit \u{1F3AF} Pick songs, then click the ones to add \u{1F380}");
     };
     const togglePick = () => {
       const next = !picking;
@@ -423,24 +395,8 @@
         }
       };
       const onMsg = (e) => {
-        if (e.channel === "suno-tracks") {
-          const got = e.args[0] || [];
-          setPageTracks((prev) => {
-            const map = new Map(prev.map((t) => [t.id, t]));
-            for (const t of got) {
-              const ex = map.get(t.id);
-              if (!ex) map.set(t.id, t);
-              else map.set(t.id, { ...ex, title: t.title && t.title !== "Suno song" && t.title !== "Untitled Suno song" ? t.title : ex.title, cover: ex.cover || t.cover, audioUrl: ex.audioUrl || t.audioUrl, lyrics: ex.lyrics || t.lyrics });
-            }
-            return Array.from(map.values()).slice(-400);
-          });
-        } else if (e.channel === "suno-played") {
-          const id = e.args[0];
-          if (id) setPlayed((p) => ({ ...p, [id]: true }));
-        } else if (e.channel === "suno-ready") {
+        if (e.channel === "suno-ready") {
           flash("Connected to Suno \u{1F380}");
-        } else if (e.channel === "suno-reset") {
-          setPageTracks([]);
         } else if (e.channel === "suno-pick") {
           const t = e.args[0];
           if (t && t.id) {
@@ -450,7 +406,6 @@
         }
       };
       const onNav = () => {
-        setPageTracks([]);
         setPicking(false);
       };
       const onCrash = () => {
@@ -512,30 +467,14 @@
     const pct = duration ? progress / duration * 100 : 0;
     const repeatOn = repeat !== "off";
     const curPl = playlists.find((p) => p.id === selPl);
-    const GENERIC_TITLE = /* @__PURE__ */ new Set(["", "suno song", "untitled suno song"]);
-    const importedIds = new Set(tracks.map((t) => t.id));
-    const importedTitles = new Set(tracks.map((t) => (t.title || "").toLowerCase()));
-    let pageView = pageTracks.filter((t) => {
-      const k = (t.title || "").toLowerCase();
-      return !importedIds.has(t.id) && (GENERIC_TITLE.has(k) || !importedTitles.has(k));
-    });
-    const seenTitle = /* @__PURE__ */ new Set();
-    pageView = pageView.filter((t) => {
-      const k = (t.title || "").toLowerCase();
-      if (GENERIC_TITLE.has(k)) return true;
-      if (seenTitle.has(k)) return false;
-      seenTitle.add(k);
-      return true;
-    });
-    if (onlyPlayed) pageView = pageView.filter((t) => played[t.id]);
     const selectable = tab === "library" || tab === "playlists" && curPl;
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TitleBar, { collapsed, onToggle: () => setCollapsed((c) => !c) }), /* @__PURE__ */ React.createElement("div", { className: "workspace" + (collapsed ? " collapsed" : "") }, /* @__PURE__ */ React.createElement("aside", { className: "sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "tabs" }, /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "library" ? " active" : ""), onClick: () => setTab("library") }, "\u{1F3B5} Library"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "playlists" ? " active" : ""), onClick: () => setTab("playlists") }, "\u{1F4C3} Playlists"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "explore" ? " active" : ""), onClick: () => {
       setTab("explore");
       setEmbedded(true);
-    } }, "\u{1F31F} Explore")), tab === "library" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "Your songs ", /* @__PURE__ */ React.createElement("small", null, tracks.length)), tracks.length > 0 && /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => setSelected(selected.length === tracks.length ? [] : tracks.map((t) => t.id)) }, selected.length === tracks.length && tracks.length ? "\u2713 none" : "\u2713 all")), /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: importSunoPlaylist }, "\u2B07 Import from my Suno playlists"), /* @__PURE__ */ React.createElement("div", { className: "sub-actions" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", onClick: connect }, "\u{1F511} Connect Suno"), /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", onClick: chromeLogin, disabled: busy }, "\u{1F310} Use Chrome login")), /* @__PURE__ */ React.createElement("div", { className: "sub-actions" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", onClick: async () => {
+    } }, "\u{1F31F} Explore")), tab === "library" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "Your songs ", /* @__PURE__ */ React.createElement("small", null, tracks.length))), /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: importSunoPlaylist }, "\u2B07 Import from my Suno songs"), /* @__PURE__ */ React.createElement("div", { className: "sub-actions" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", title: "Save all your imported songs + playlists to a .json file you pick", onClick: async () => {
       const ok = await api.exportLibrary();
       if (ok) flash("Library backed up \u{1F4BE}");
-    } }, "\u{1F4BE} Backup"), /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", onClick: async () => {
+    } }, "\u{1F4BE} Backup"), /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", title: "Load songs + playlists back from a backup .json (merges \u2014 no duplicates)", onClick: async () => {
       const ok = await api.importLibrary();
       flash(ok ? "Library restored \u{1F49C}" : "Nothing restored.", !ok);
     } }, "\u{1F4C2} Restore"))), tab === "playlists" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, curPl ? curPl.name : "Playlists", " ", /* @__PURE__ */ React.createElement("small", null, curPl ? curPl.trackIds.length : playlists.length)), curPl ? /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => setSelPl(null) }, "\u2190 all") : /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
@@ -568,15 +507,11 @@
     } }, "Make")), !curPl && /* @__PURE__ */ React.createElement("div", { className: "pl-grid" }, playlists.length === 0 && !creating && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, "No playlists yet \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Make one, then right-click songs to add them."), playlists.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "pl-card", onClick: () => setSelPl(p.id) }, /* @__PURE__ */ React.createElement("div", { className: "pl-emoji" }, GLYPHS[p.name.length % GLYPHS.length]), /* @__PURE__ */ React.createElement("div", { className: "pl-name" }, p.name), /* @__PURE__ */ React.createElement("div", { className: "pl-count" }, p.trackIds.length, " songs"), /* @__PURE__ */ React.createElement("button", { className: "pl-del", title: "Delete", onClick: (e) => {
       e.stopPropagation();
       api.deletePlaylist(p.id);
-    } }, "\u2715"))))), tab === "explore" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "To import ", /* @__PURE__ */ React.createElement("small", null, pageView.length)), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (onlyPlayed ? " hot" : ""), onClick: () => setOnlyPlayed((v) => !v) }, onlyPlayed ? "\u25B6 played" : "all")), pageView.length > 0 && /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: () => {
-      pageView.forEach((t) => api.importTrack(t));
-      flash("Imported " + pageView.length + " song" + (pageView.length > 1 ? "s" : "") + " \u{1F49C}");
-    } }, "\uFF0B Import these ", pageView.length), /* @__PURE__ */ React.createElement("div", { className: "tracklist" }, pageView.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, onlyPlayed ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Play the songs you want on the right \u25B6", /* @__PURE__ */ React.createElement("br", null), "Only ones you play show here (toggle \u201Cplayed\u201D off to see all).") : /* @__PURE__ */ React.createElement(React.Fragment, null, "Browse Suno on the right \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "New songs appear here \u2014 tap \uFF0B to import.")), pageView.map((t, i) => /* @__PURE__ */ React.createElement("div", { key: t.id + ":" + i, className: "track", style: { animationDelay: Math.min(i * 0.03, 0.4) + "s" } }, !played[t.id] && /* @__PURE__ */ React.createElement("span", { className: "newdot", title: "not played yet" }), t.cover ? /* @__PURE__ */ React.createElement("img", { className: "thumb", src: t.cover, alt: "", onError: (e) => {
-      e.target.style.display = "none";
-    } }) : /* @__PURE__ */ React.createElement("div", { className: "tnum" }, GLYPHS[i % GLYPHS.length]), /* @__PURE__ */ React.createElement("div", { className: "tmeta" }, /* @__PURE__ */ React.createElement("div", { className: "tname" }, t.title), /* @__PURE__ */ React.createElement("div", { className: "tsrc" }, played[t.id] ? "\u25B6 played" : "\u{1F339} Suno")), /* @__PURE__ */ React.createElement("button", { className: "imp-btn", title: "Import", onClick: () => {
-      api.importTrack(t);
-      flash('Imported "' + String(t.title).slice(0, 24) + '" \u{1F49C}');
-    } }, "\uFF0B"))))), selectable && selected.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "selbar" }, /* @__PURE__ */ React.createElement("span", { className: "selcount" }, selected.length, " selected"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: downloadSel }, "\u2B07 Download"), /* @__PURE__ */ React.createElement("div", { className: "movewrap", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setPlMenuOpen((o) => !o) }, "\u{1F4C3} Move \u25BE"), plMenuOpen && /* @__PURE__ */ React.createElement("div", { className: "movemenu" }, playlists.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "ctx-empty" }, "No playlists"), playlists.map((p) => /* @__PURE__ */ React.createElement("button", { key: p.id, className: "ctx-item", onClick: () => moveSel(p.id, p.name) }, GLYPHS[p.name.length % GLYPHS.length], " ", p.name)), /* @__PURE__ */ React.createElement("button", { className: "ctx-item", onClick: async () => {
+    } }, "\u2715"))))), tab === "explore" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "Explore Suno")), /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, "Browse Suno on the right \u{1F339}", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Log in once if asked \u2014 it's remembered.", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), "Hit ", /* @__PURE__ */ React.createElement("b", null, "\u{1F3AF} Pick songs"), " above the page, then click any song to add it to your library.")), selectable && selected.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "selbar" }, /* @__PURE__ */ React.createElement("span", { className: "selcount" }, selected.length, " selected"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", title: "Select all / none", onClick: () => {
+      const ids = list.map((t) => t.id);
+      const allSel = ids.length && ids.every((id) => selected.includes(id));
+      setSelected(allSel ? [] : ids);
+    } }, list.length && list.every((t) => selected.includes(t.id)) ? "\u2713 none" : "\u2713 all"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: downloadSel }, "\u2B07 Download"), /* @__PURE__ */ React.createElement("div", { className: "movewrap", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setPlMenuOpen((o) => !o) }, "\u{1F4C3} Move \u25BE"), plMenuOpen && /* @__PURE__ */ React.createElement("div", { className: "movemenu" }, playlists.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "ctx-empty" }, "No playlists"), playlists.map((p) => /* @__PURE__ */ React.createElement("button", { key: p.id, className: "ctx-item", onClick: () => moveSel(p.id, p.name) }, GLYPHS[p.name.length % GLYPHS.length], " ", p.name)), /* @__PURE__ */ React.createElement("button", { className: "ctx-item", onClick: async () => {
       const p = await api.createPlaylist("Playlist " + (playlists.length + 1));
       if (p) moveSel(p.id, p.name);
     } }, "\uFF0B New playlist"))), /* @__PURE__ */ React.createElement("button", { className: "sel-act danger", onClick: removeSel }, "\u{1F5D1}"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setSelected([]) }, "\u2715")), (tab === "library" || tab === "playlists" && curPl) && /* @__PURE__ */ React.createElement("div", { className: "tracklist" }, list.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, tab === "playlists" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Empty playlist \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Select songs in Library \u2192 Move here.") : /* @__PURE__ */ React.createElement(React.Fragment, null, "No songs yet \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Import from your Suno playlists or Explore.")), list.map((t, i) => /* @__PURE__ */ React.createElement(
@@ -599,7 +534,7 @@
     } }, "\u2190"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
       const w = webviewRef.current;
       if (w && w.reload) w.reload();
-    } }, "\u27F3"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (picking ? " hot" : ""), title: "Click songs in the page to add them", onClick: togglePick }, picking ? "\u{1F3AF} Click a song\u2026" : "\u{1F3AF} Pick songs"), /* @__PURE__ */ React.createElement("span", { className: "embed-hint" }, picking ? "click any song in the page to add it \u{1F3AF}" : "songs show in the list \u2190 tap \uFF0B to import \u{1F49C}")), /* @__PURE__ */ React.createElement(
+    } }, "\u27F3"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (picking ? " hot" : ""), title: "Click songs in the page to add them", onClick: togglePick }, picking ? "\u{1F3AF} Click a song\u2026" : "\u{1F3AF} Pick songs"), /* @__PURE__ */ React.createElement("span", { className: "embed-hint" }, picking ? "click any song in the page to add it \u{1F3AF}" : "hit \u{1F3AF} Pick songs, then click songs to add them \u{1F49C}")), /* @__PURE__ */ React.createElement(
       "webview",
       {
         ref: webviewRef,

@@ -2,6 +2,25 @@
 
 Newest first. Short notes only.
 
+## v1.2.9 — 2026-06-19
+- Removed: **auto song detection** in Explore (the "To import" list) and the
+  **all / played** filter. Adding songs is now just **🎯 Pick songs** — click the
+  ones you want. (Also stripped the page-scraping/network hooks from the embed.)
+- Removed: **🔑 Connect Suno** button in Library (logging in already lives in the
+  Explore pane) and the **🌐 Use Chrome login** feature entirely (Chrome's
+  app-bound encryption made it a dead end; dropped the sql.js dependency too).
+- Fixed: **lyrics now auto-scroll** with the song — the panel needed
+  `position: relative` so each line's position is measured correctly.
+- Fixed: **select / select-all moved into the selection bar** and only shows once
+  at least one song is picked (next to Download / Move / Trash / ✕). Tick a song's
+  box to start a selection.
+- Changed: **bigger song rows** in the sidebar (larger covers, titles, art).
+- Changed: **the playing song is now clearly highlighted** in the list (rose glow,
+  bright title, glowing accent bar).
+- Backup / Restore: added hover tooltips explaining them — **Backup** saves your
+  songs + playlists to a `.json` file you choose; **Restore** loads them back from
+  one (merges, no duplicates).
+
 ## v1.2.8 — 2026-06-19
 - Fixed: **select / select-all now shows the checkmark** (the row's checkbox was
   wired to the wrong prop, so it never lit up or highlighted the row).

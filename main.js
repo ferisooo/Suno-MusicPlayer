@@ -1,14 +1,11 @@
 // main.js — Electron main process.
 // Owns persistent state (imported songs + playlists), the embedded-Suno
 // harvester, right-click import, and the experimental Chrome cookie import.
-const { app, BrowserWindow, ipcMain, dialog, shell, session, net, webContents, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, net, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const https = require('https');
 const http = require('http');
-const crypto = require('crypto');
-const { execFile } = require('child_process');
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -216,60 +213,18 @@ ipcMain.handle('tracks:download', async (_e, ids) => {
   return { ok: n > 0, count: n, dir };
 });
 
-/* ===================== embedded harvest (opt-in import) ===================== */
+/* ===================== embedded Suno: capture auth token for private audio ===================== */
 const attached = new Set();
-const pool = new Map();       // suno id -> track
-let pageIds = new Set();      // ids seen on the current page
-const playedIds = new Set();  // ids whose audio actually streamed (= played)
-let lastSunoWc = null;
-
-function markPlayed(id) {
-  if (playedIds.has(id)) return;
-  playedIds.add(id);
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('suno:played', { id });
-}
-
-function harvestTracks(node, out, seen) {
-  out = out || []; seen = seen || new Set();
-  if (!node || typeof node !== 'object') return out;
-  if (Array.isArray(node)) { for (const x of node) harvestTracks(x, out, seen); return out; }
-  const audio = node.audio_url || node.audioUrl || node.audio || node.stream_url || null;
-  if (audio && typeof audio === 'string' && /^https?:\/\//.test(audio) && /\.(mp3|m4a|mp4|ogg|wav)(\?|$)/i.test(audio)) {
-    const id = String(node.id || node.clip_id || audio);
-    if (!seen.has(id)) {
-      seen.add(id);
-      const md = node.metadata || {};
-      out.push({
-        id: 'sunoR:' + id, rawId: id,
-        title: node.title || md.title || node.display_name || 'Untitled Suno song',
-        audioUrl: audio,
-        cover: node.image_url || node.image_large_url || md.cover_image_url || null,
-        lyrics: md.prompt || md.lyrics || node.lyrics || null,
-        source: 'suno',
-      });
-    }
-  }
-  for (const k in node) { const v = node[k]; if (v && typeof v === 'object') harvestTracks(v, out, seen); }
-  return out;
-}
-
-function importVisible(playlistId) {
-  let n = 0;
-  for (const id of pageIds) { const t = pool.get(id); if (t) { importTrack(t, playlistId); n++; } }
-  notify(n ? ('Imported ' + n + ' song' + (n > 1 ? 's' : '') + ' from this page 💜') : 'No songs found on this page to import.', !n);
-}
 
 function attachHarvest(wc) {
   if (!wc || attached.has(wc.id)) return;
   attached.add(wc.id);
-  lastSunoWc = wc;
-  wc.on('destroyed', () => { attached.delete(wc.id); if (lastSunoWc === wc) lastSunoWc = null; });
+  wc.on('destroyed', () => { attached.delete(wc.id); });
 
   try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch {}
 
-  // capture the bearer token Suno's page sends, so we can fetch private audio.
-  // (Harvesting of the song list happens in renderer/suno-preload.js instead of
-  //  the CDP debugger, which could crash the renderer.)
+  // capture the bearer token Suno's page sends, so we can fetch private audio
+  // for the songs you Pick.
   try {
     wc.session.webRequest.onBeforeSendHeaders((details, cb) => {
       const h = details.requestHeaders;
@@ -281,7 +236,6 @@ function attachHarvest(wc) {
 }
 
 ipcMain.handle('suno:attach', (_e, wcId) => { attachHarvest(webContents.fromId(wcId)); return true; });
-ipcMain.handle('suno:importVisible', (_e, playlistId) => { importVisible(playlistId || null); return true; });
 
 /* ===================== backup / restore ===================== */
 ipcMain.handle('config:export', async () => {
@@ -300,113 +254,3 @@ ipcMain.handle('config:import', async () => {
   } catch { return false; }
 });
 
-/* ===================== experimental Chrome cookie import ===================== */
-function dpapiUnprotect(buf) {
-  return new Promise((resolve, reject) => {
-    const tmpIn = path.join(os.tmpdir(), 'kw_dpapi_in_' + Date.now() + '.txt');
-    const ps = path.join(os.tmpdir(), 'kw_dpapi_' + Date.now() + '.ps1');
-    fs.writeFileSync(tmpIn, buf.toString('base64'));
-    fs.writeFileSync(ps,
-      "$ErrorActionPreference='Stop'\n" +
-      "Add-Type -AssemblyName System.Security\n" +
-      "$b=[Convert]::FromBase64String((Get-Content -Raw '" + tmpIn.replace(/\\/g, '\\\\') + "'))\n" +
-      "$d=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,'CurrentUser')\n" +
-      "[Convert]::ToBase64String($d)\n");
-    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps], (err, stdout) => {
-      try { fs.unlinkSync(tmpIn); fs.unlinkSync(ps); } catch {}
-      if (err) return reject(err);
-      resolve(Buffer.from(String(stdout).trim(), 'base64'));
-    });
-  });
-}
-
-async function chromeImport() {
-  let initSqlJs;
-  try { initSqlJs = require('sql.js'); } catch { return { ok: false, message: 'Cookie reader (sql.js) not installed.' }; }
-  const local = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-  const udir = path.join(local, 'Google', 'Chrome', 'User Data');
-  const localState = path.join(udir, 'Local State');
-  if (!fs.existsSync(localState)) return { ok: false, message: 'Chrome was not found on this PC.' };
-
-  let aesKey;
-  try {
-    const ls = JSON.parse(fs.readFileSync(localState, 'utf8'));
-    let enc = Buffer.from(ls.os_crypt.encrypted_key, 'base64');
-    if (enc.slice(0, 5).toString() === 'DPAPI') enc = enc.slice(5);
-    aesKey = await dpapiUnprotect(enc);
-  } catch { return { ok: false, message: 'Could not read Chrome\'s encryption key.' }; }
-
-  // Enumerate EVERY Chrome profile (you may be signed into Suno under any of them),
-  // not just Default / Profile 1.
-  let profileNames = ['Default', 'Profile 1', 'Profile 2', 'Profile 3', 'Profile 4'];
-  try {
-    const extra = fs.readdirSync(udir, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && /^(Default|Profile \d+)$/.test(d.name))
-      .map((d) => d.name);
-    profileNames = Array.from(new Set(profileNames.concat(extra)));
-  } catch {}
-  const dbs = [];
-  for (const name of profileNames) {
-    for (const sub of [['Network', 'Cookies'], ['Cookies']]) {
-      const p = path.join(udir, name, ...sub);
-      if (fs.existsSync(p) && !dbs.includes(p)) dbs.push(p);
-    }
-  }
-  if (!dbs.length) return { ok: false, message: 'No Chrome cookie store found on this PC.' };
-
-  let SQL;
-  try { SQL = await initSqlJs({ locateFile: (f) => path.join(path.dirname(require.resolve('sql.js')), f) }); }
-  catch { return { ok: false, message: 'Could not start the cookie reader.' }; }
-
-  let count = 0, abe = 0, sawRows = 0, openFail = 0;
-  for (const dbPath of dbs) {
-    let buf;
-    try { const tmp = path.join(os.tmpdir(), 'kw_ck_' + Date.now() + '_' + Math.random().toString(36).slice(2)); fs.copyFileSync(dbPath, tmp); buf = fs.readFileSync(tmp); fs.unlinkSync(tmp); } catch { openFail++; continue; }
-    let db; try { db = new SQL.Database(buf); } catch { openFail++; continue; }
-    let res; try { res = db.exec("SELECT host_key,name,encrypted_value,path,is_secure,expires_utc FROM cookies WHERE host_key LIKE '%suno%' OR host_key LIKE '%clerk%'"); } catch { db.close(); openFail++; continue; }
-    if (!res.length) { db.close(); continue; }
-    const cols = res[0].columns, rows = res[0].values;
-    sawRows += rows.length;
-    for (const row of rows) {
-      const o = {}; cols.forEach((c, i) => (o[c] = row[i]));
-      if (!o.encrypted_value) continue;
-      const ev = Buffer.from(o.encrypted_value);
-      const prefix = ev.slice(0, 3).toString();
-      let value = null;
-      if (prefix === 'v10' || prefix === 'v11') {
-        try {
-          const nonce = ev.slice(3, 15), tag = ev.slice(ev.length - 16), ct = ev.slice(15, ev.length - 16);
-          const dec = crypto.createDecipheriv('aes-256-gcm', aesKey, nonce); dec.setAuthTag(tag);
-          let pt = Buffer.concat([dec.update(ct), dec.final()]);
-          value = pt.toString('utf8');
-          if (pt.length > 32 && /[^\x20-\x7e]/.test(value.slice(0, 4))) value = pt.slice(32).toString('utf8');
-        } catch { continue; }
-      } else if (prefix === 'v20') { abe++; continue; }
-      else { continue; }
-      if (value == null) continue;
-      const host = o.host_key.replace(/^\./, '');
-      const url = (o.is_secure ? 'https://' : 'http://') + host + (o.path || '/');
-      try {
-        await sunoSession().cookies.set({
-          url, name: o.name, value, path: o.path || '/', secure: !!o.is_secure,
-          expirationDate: o.expires_utc ? (o.expires_utc / 1000000 - 11644473600) : undefined,
-        });
-        count++;
-      } catch {}
-    }
-    db.close();
-  }
-  if (count === 0 && abe > 0) return { ok: false, message: 'Your Chrome version locks cookies (app-bound encryption) — they can\'t be imported. Please log in once manually; it\'s remembered after.' };
-  if (count === 0 && sawRows > 0) return { ok: false, message: 'Found your Suno cookies but couldn\'t decrypt them — fully close Chrome and try again, or just log in here once (it\'s remembered).' };
-  if (count === 0 && openFail > 0 && sawRows === 0) return { ok: false, message: 'Couldn\'t read Chrome\'s cookies — close Chrome completely and try again, or log in here once.' };
-  if (count === 0) return { ok: false, message: 'No Suno cookies found in Chrome (checked ' + dbs.length + ' profile' + (dbs.length > 1 ? 's' : '') + '). Open suno.com in Chrome and sign in there, or just log in here once.' };
-  return { ok: true, count };
-}
-
-ipcMain.handle('suno:chromeLogin', async () => {
-  try {
-    const r = await chromeImport();
-    if (r.ok && lastSunoWc && !lastSunoWc.isDestroyed()) { try { lastSunoWc.loadURL('https://suno.com/me'); } catch {} }
-    return r;
-  } catch (e) { return { ok: false, message: e.message || 'Chrome import failed.' }; }
-});

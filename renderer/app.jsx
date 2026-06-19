@@ -89,11 +89,8 @@ function App() {
   const [embedded, setEmbedded] = useState(false);
   const [sunoStart, setSunoStart] = useState('https://suno.com/me');
   const [ctx, setCtx] = useState(null);          // {x,y,track}
-  const [pageTracks, setPageTracks] = useState([]);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
-  const [played, setPlayed] = useState({});       // explore: id -> true (streamed)
-  const [onlyPlayed, setOnlyPlayed] = useState(false);
   const [selected, setSelected] = useState([]);   // library: selected track ids
   const [plMenuOpen, setPlMenuOpen] = useState(false);
   const [picking, setPicking] = useState(false);   // explore: click-a-song-to-add mode
@@ -114,8 +111,6 @@ function App() {
     (async () => { try { const s = await api.getState(); setTracks(s.tracks || []); setPlaylists(s.playlists || []); } catch {} })();
     api.onState && api.onState((s) => { setTracks(s.tracks || []); setPlaylists(s.playlists || []); });
     api.onToast && api.onToast(({ msg, err }) => flash(msg, err));
-    api.onSunoPage && api.onSunoPage(({ tracks: pt }) => setPageTracks(pt || []));
-    api.onSunoPlayed && api.onSunoPlayed(({ id }) => setPlayed((p) => ({ ...p, [id]: true })));
   }, []);
 
   /* ---- audio + analyser ---- */
@@ -210,9 +205,7 @@ function App() {
     catch (e) { flash(e.message || 'Suno load failed.', true); } finally { setBusy(false); }
   };
   function navSuno(url) { const wv = webviewRef.current; if (wv && wv.loadURL) { try { wv.loadURL(url); } catch {} } else setSunoStart(url); }
-  const importSunoPlaylist = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Open a playlist, then right-click songs (or ⬇ import all) 🎀'); };
-  const connect = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Log into Suno below — it\'s remembered after 🔑'); };
-  const chromeLogin = async () => { setBusy(true); flash('Trying to import your Chrome login… 🔑'); try { const r = await api.chromeLogin(); flash(r.ok ? ('Imported ' + r.count + ' cookies — you should be logged in 💜') : r.message, !r.ok); if (r.ok) { setEmbedded(true); setTab('explore'); } } catch (e) { flash('Chrome import failed.', true); } finally { setBusy(false); } };
+  const importSunoPlaylist = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Open your songs, hit 🎯 Pick songs, then click the ones to add 🎀'); };
   // Manual pick mode: click a song right in the Suno pane to add exactly that one.
   const togglePick = () => { const next = !picking; setPicking(next); const w = webviewRef.current; if (w && w.send) { try { w.send('kw-pick-mode', next); } catch {} } flash(next ? 'Pick mode on — click any song in the page to add it 🎯' : 'Pick mode off'); };
 
@@ -220,29 +213,14 @@ function App() {
     if (!embedded) return; const wv = webviewRef.current; if (!wv) return;
     const onReady = () => { try { api.attachSuno(wv.getWebContentsId()); } catch {} };
     const onMsg = (e) => {
-      if (e.channel === 'suno-tracks') {
-        const got = e.args[0] || [];
-        setPageTracks((prev) => {
-          const map = new Map(prev.map((t) => [t.id, t]));
-          for (const t of got) {
-            const ex = map.get(t.id);
-            if (!ex) map.set(t.id, t);
-            else map.set(t.id, { ...ex, title: (t.title && t.title !== 'Suno song' && t.title !== 'Untitled Suno song') ? t.title : ex.title, cover: ex.cover || t.cover, audioUrl: ex.audioUrl || t.audioUrl, lyrics: ex.lyrics || t.lyrics });
-          }
-          return Array.from(map.values()).slice(-400);
-        });
-      } else if (e.channel === 'suno-played') {
-        const id = e.args[0]; if (id) setPlayed((p) => ({ ...p, [id]: true }));
-      } else if (e.channel === 'suno-ready') {
+      if (e.channel === 'suno-ready') {
         flash('Connected to Suno 🎀');
-      } else if (e.channel === 'suno-reset') {
-        setPageTracks([]);
       } else if (e.channel === 'suno-pick') {
         const t = e.args[0];
         if (t && t.id) { api.importTrack(t); flash('Added "' + String(t.title || 'song').slice(0, 28) + '" 💜'); }
       }
     };
-    const onNav = () => { setPageTracks([]); setPicking(false); };   // page reload drops pick mode in-guest
+    const onNav = () => { setPicking(false); };   // page reload drops pick mode in-guest
     const onCrash = () => { try { wv.reload(); } catch {} };
     wv.addEventListener('dom-ready', onReady);
     wv.addEventListener('ipc-message', onMsg);
@@ -272,16 +250,6 @@ function App() {
   const repeatOn = repeat !== 'off';
   const curPl = playlists.find((p) => p.id === selPl);
 
-  // explore: hide already-imported, collapse same-title dupes, optionally played-only.
-  // Generic placeholder titles (a scrape that found the song but not its name) are
-  // NEVER collapsed/filtered by title — otherwise many distinct songs would merge into one.
-  const GENERIC_TITLE = new Set(['', 'suno song', 'untitled suno song']);
-  const importedIds = new Set(tracks.map((t) => t.id));
-  const importedTitles = new Set(tracks.map((t) => (t.title || '').toLowerCase()));
-  let pageView = pageTracks.filter((t) => { const k = (t.title || '').toLowerCase(); return !importedIds.has(t.id) && (GENERIC_TITLE.has(k) || !importedTitles.has(k)); });
-  const seenTitle = new Set();
-  pageView = pageView.filter((t) => { const k = (t.title || '').toLowerCase(); if (GENERIC_TITLE.has(k)) return true; if (seenTitle.has(k)) return false; seenTitle.add(k); return true; });
-  if (onlyPlayed) pageView = pageView.filter((t) => played[t.id]);
   const selectable = tab === 'library' || (tab === 'playlists' && curPl);
 
   return (
@@ -300,16 +268,11 @@ function App() {
             <>
               <div className="side-head">
                 <div className="side-title">Your songs <small>{tracks.length}</small></div>
-                {tracks.length > 0 && <button className="pill-btn" onClick={() => setSelected(selected.length === tracks.length ? [] : tracks.map((t) => t.id))}>{selected.length === tracks.length && tracks.length ? '✓ none' : '✓ all'}</button>}
               </div>
-              <button className="connect-btn" onClick={importSunoPlaylist}>⬇ Import from my Suno playlists</button>
+              <button className="connect-btn" onClick={importSunoPlaylist}>⬇ Import from my Suno songs</button>
               <div className="sub-actions">
-                <button className="ghost-btn" onClick={connect}>🔑 Connect Suno</button>
-                <button className="ghost-btn" onClick={chromeLogin} disabled={busy}>🌐 Use Chrome login</button>
-              </div>
-              <div className="sub-actions">
-                <button className="ghost-btn" onClick={async () => { const ok = await api.exportLibrary(); if (ok) flash('Library backed up 💾'); }}>💾 Backup</button>
-                <button className="ghost-btn" onClick={async () => { const ok = await api.importLibrary(); flash(ok ? 'Library restored 💜' : 'Nothing restored.', !ok); }}>📂 Restore</button>
+                <button className="ghost-btn" title="Save all your imported songs + playlists to a .json file you pick" onClick={async () => { const ok = await api.exportLibrary(); if (ok) flash('Library backed up 💾'); }}>💾 Backup</button>
+                <button className="ghost-btn" title="Load songs + playlists back from a backup .json (merges — no duplicates)" onClick={async () => { const ok = await api.importLibrary(); flash(ok ? 'Library restored 💜' : 'Nothing restored.', !ok); }}>📂 Restore</button>
               </div>
             </>
           )}
@@ -343,19 +306,11 @@ function App() {
 
           {tab === 'explore' && (
             <>
-              <div className="side-head"><div className="side-title">To import <small>{pageView.length}</small></div>
-                <button className={'pill-btn' + (onlyPlayed ? ' hot' : '')} onClick={() => setOnlyPlayed((v) => !v)}>{onlyPlayed ? '▶ played' : 'all'}</button></div>
-              {pageView.length > 0 && <button className="connect-btn" onClick={() => { pageView.forEach((t) => api.importTrack(t)); flash('Imported ' + pageView.length + ' song' + (pageView.length > 1 ? 's' : '') + ' 💜'); }}>＋ Import these {pageView.length}</button>}
-              <div className="tracklist">
-                {pageView.length === 0 && <div className="empty-note">{onlyPlayed ? <>Play the songs you want on the right ▶<br/>Only ones you play show here (toggle “played” off to see all).</> : <>Browse Suno on the right 🌸<br/>New songs appear here — tap ＋ to import.</>}</div>}
-                {pageView.map((t, i) => (
-                  <div key={t.id + ':' + i} className="track" style={{ animationDelay: Math.min(i * 0.03, 0.4) + 's' }}>
-                    {!played[t.id] && <span className="newdot" title="not played yet" />}
-                    {t.cover ? <img className="thumb" src={t.cover} alt="" onError={(e) => { e.target.style.display = 'none'; }} /> : <div className="tnum">{GLYPHS[i % GLYPHS.length]}</div>}
-                    <div className="tmeta"><div className="tname">{t.title}</div><div className="tsrc">{played[t.id] ? '▶ played' : '🌹 Suno'}</div></div>
-                    <button className="imp-btn" title="Import" onClick={() => { api.importTrack(t); flash('Imported "' + String(t.title).slice(0, 24) + '" 💜'); }}>＋</button>
-                  </div>
-                ))}
+              <div className="side-head"><div className="side-title">Explore Suno</div></div>
+              <div className="empty-note">
+                Browse Suno on the right 🌹<br/><br/>
+                Log in once if asked — it's remembered.<br/><br/>
+                Hit <b>🎯 Pick songs</b> above the page, then click any song to add it to your library.
               </div>
             </>
           )}
@@ -363,6 +318,7 @@ function App() {
           {selectable && selected.length > 0 && (
             <div className="selbar">
               <span className="selcount">{selected.length} selected</span>
+              <button className="sel-act" title="Select all / none" onClick={() => { const ids = list.map((t) => t.id); const allSel = ids.length && ids.every((id) => selected.includes(id)); setSelected(allSel ? [] : ids); }}>{list.length && list.every((t) => selected.includes(t.id)) ? '✓ none' : '✓ all'}</button>
               <button className="sel-act" onClick={downloadSel}>⬇ Download</button>
               <div className="movewrap" onClick={(e) => e.stopPropagation()}>
                 <button className="sel-act" onClick={() => setPlMenuOpen((o) => !o)}>📃 Move ▾</button>
@@ -420,7 +376,7 @@ function App() {
                   <button className="pill-btn" onClick={() => { const w = webviewRef.current; if (w && w.canGoBack && w.canGoBack()) w.goBack(); }}>←</button>
                   <button className="pill-btn" onClick={() => { const w = webviewRef.current; if (w && w.reload) w.reload(); }}>⟳</button>
                   <button className={'pill-btn' + (picking ? ' hot' : '')} title="Click songs in the page to add them" onClick={togglePick}>{picking ? '🎯 Click a song…' : '🎯 Pick songs'}</button>
-                  <span className="embed-hint">{picking ? 'click any song in the page to add it 🎯' : 'songs show in the list ← tap ＋ to import 💜'}</span>
+                  <span className="embed-hint">{picking ? 'click any song in the page to add it 🎯' : 'hit 🎯 Pick songs, then click songs to add them 💜'}</span>
                 </div>
                 <webview ref={webviewRef} className="suno-webview" src={sunoStart} partition="persist:suno"
                          preload={api.sunoPreloadPath} webpreferences="contextIsolation=no,sandbox=no,nodeIntegration=no"></webview>

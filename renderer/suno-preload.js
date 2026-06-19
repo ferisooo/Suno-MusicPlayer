@@ -1,19 +1,11 @@
 // suno-preload.js — runs INSIDE the embedded Suno page (the webview guest).
-// Primary harvest is DOM scraping (works regardless of how the page loads data,
-// and works even with context isolation). Network hooks are a bonus for richer
-// metadata. Talks to the host via ipcRenderer.sendToHost. No CDP debugger.
+// Its only job is the manual "Pick" mode: the host toggles it on, then a click on
+// a song row in the page imports exactly that song. No auto-detection / scraping,
+// no network hooks, no CDP debugger. Talks to the host via ipcRenderer.sendToHost.
 const { ipcRenderer } = require('electron');
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-function send(tracks) { if (tracks && tracks.length) { try { ipcRenderer.sendToHost('suno-tracks', tracks); } catch {} } }
-
-/* ---------- DOM scrape (primary) ----------
-   Library/playlist rows on Suno often AREN'T <a href="/song/…"> links — the title
-   navigates via JS — so anchor-only scraping misses them. We pull the song id from
-   three signals that ARE present on those rows: song links, data-clip attributes,
-   and the cover thumbnail (its URL embeds the clip id), then read the title from
-   the row container. */
 function cleanTitle(t) {
   t = (t || '').replace(/\s+/g, ' ').trim();
   if (!t) return '';
@@ -40,110 +32,9 @@ function looksLikeAvatar(img) {
   return /avatar|profile|pfp|user-?img/i.test(tag) || (w > 0 && w < 40);   // tiny / profile images aren't covers
 }
 
-function scanDom() {
-  try {
-    const byId = new Map();
-    const ensure = (id) => { if (!byId.has(id)) byId.set(id, { title: '', cover: null }); return byId.get(id); };
-
-    // 1) song links → id + title
-    document.querySelectorAll('a[href*="/song/"]').forEach((a) => {
-      const m = (a.getAttribute('href') || a.href || '').match(UUID); if (!m) return;
-      const e = ensure(m[0]);
-      const t = cleanTitle(a.getAttribute('title') || a.getAttribute('aria-label') || a.textContent);
-      if (t && !e.title) e.title = t;
-    });
-    // 2) data-clip attributes (rows that navigate via JS, no anchor)
-    document.querySelectorAll('[data-clip-id],[data-song-id],[data-key]').forEach((el) => {
-      const dc = el.getAttribute('data-clip-id') || el.getAttribute('data-song-id') || el.getAttribute('data-key') || '';
-      const m = dc.match(UUID); if (!m) return;
-      const e = ensure(m[0]);
-      if (!e.title) { const t = titleFromRow(el); if (t) e.title = t; }
-    });
-    // 3) cover thumbnails on the suno CDN carry the clip id (present on every row)
-    document.querySelectorAll('img[src*="suno"]').forEach((img) => {
-      const m = (img.src || '').match(UUID); if (!m) return;
-      if (looksLikeAvatar(img)) return;
-      const e = ensure(m[0]);
-      if (!e.cover) e.cover = img.src;
-      if (!e.title) { const t = titleFromRow(img); if (t) e.title = t; }
-    });
-
-    const out = [];
-    byId.forEach((v, id) => out.push({
-      id: 'sunoR:' + id,
-      title: v.title || 'Suno song',
-      audioUrl: 'https://cdn1.suno.ai/' + id + '.mp3',
-      cover: v.cover, source: 'suno',
-    }));
-    send(out);
-  } catch {}
-}
-
-
-/* ---------- network hooks (bonus, richer data) ---------- */
-function extractTracks(node, out, seen) {
-  out = out || []; seen = seen || new Set();
-  if (!node || typeof node !== 'object') return out;
-  if (Array.isArray(node)) { for (const x of node) extractTracks(x, out, seen); return out; }
-  const audio = node.audio_url || node.audioUrl || node.audio || node.stream_url || null;
-  if (audio && typeof audio === 'string' && /^https?:\/\//.test(audio) && /\.(mp3|m4a|mp4|ogg|wav)(\?|$)/i.test(audio)) {
-    const id = String(node.id || node.clip_id || audio);
-    if (!seen.has(id)) {
-      seen.add(id);
-      const md = node.metadata || {};
-      out.push({ id: 'sunoR:' + id, title: node.title || md.title || 'Suno song', audioUrl: audio, cover: node.image_url || node.image_large_url || md.cover_image_url || null, lyrics: md.prompt || md.lyrics || node.lyrics || null, source: 'suno' });
-    }
-  }
-  for (const k in node) { const v = node[k]; if (v && typeof v === 'object') extractTracks(v, out, seen); }
-  return out;
-}
-function handleJson(text) { try { send(extractTracks(JSON.parse(text))); } catch {} }
-
-try {
-  const _fetch = window.fetch;
-  if (_fetch) window.fetch = function () {
-    return _fetch.apply(this, arguments).then((res) => {
-      try { const ct = (res.headers && res.headers.get && res.headers.get('content-type')) || ''; if (/json/i.test(ct)) res.clone().text().then(handleJson).catch(() => {}); } catch {}
-      return res;
-    });
-  };
-  const _send = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.send = function () {
-    try { this.addEventListener('load', function () { try { const ct = (this.getResponseHeader && this.getResponseHeader('content-type')) || ''; if (/json/i.test(ct) && typeof this.responseText === 'string') handleJson(this.responseText); } catch {} }); } catch {}
-    return _send.apply(this, arguments);
-  };
-} catch {}
-
-/* ---------- played detection (click a song card, or audio src w/ id) ---------- */
-function idFromNode(node) {
-  if (!node) return null;
-  const link = (node.matches && node.matches('a[href*="/song/"]')) ? node : (node.querySelector && node.querySelector('a[href*="/song/"]'));
-  const href = link ? (link.getAttribute('href') || link.href || '') : '';
-  let m = href.match(UUID);
-  if (!m && node.getAttribute) { const dc = node.getAttribute('data-clip-id') || node.getAttribute('data-key') || ''; m = dc.match(UUID); }
-  return m ? m[0] : null;
-}
-try {
-  document.addEventListener('click', (e) => {
-    try {
-      const card = (e.target.closest && (e.target.closest('a[href*="/song/"]') || e.target.closest('[data-clip-id],[class*="card"],[class*="row"],li,article'))) || null;
-      const id = idFromNode(card);
-      if (id) ipcRenderer.sendToHost('suno-played', 'sunoR:' + id);
-    } catch {}
-  }, true);
-  document.addEventListener('play', (e) => {
-    const t = e.target;
-    if (t && (t.tagName === 'AUDIO' || t.tagName === 'VIDEO')) {
-      const m = String(t.currentSrc || t.src || '').match(UUID);
-      if (m) { try { ipcRenderer.sendToHost('suno-played', 'sunoR:' + m[0]); } catch {} }
-    }
-  }, true);
-} catch {}
-
 /* ---------- manual pick mode: click a song in the page to add exactly that one ----------
    Toggled from the host. While on, hovering highlights the song row under the cursor and
-   a click imports THAT song (and is swallowed so the page doesn't navigate/play). This is
-   the reliable manual alternative to auto-detection. */
+   a click imports THAT song (and is swallowed so the page doesn't navigate/play). */
 function rowOf(node) {
   if (node && node.closest) {
     const r = node.closest('[data-clip-id],[data-key],li,article,[class*="row" i],[class*="card" i],[class*="track" i],[class*="song" i]');
@@ -176,7 +67,7 @@ function setHover(r) {
   if (hoverRow === r) return;
   if (hoverRow) hoverRow.style.outline = '';
   hoverRow = r;
-  if (hoverRow) { hoverRow.style.outline = '2px solid #ff4fa3'; hoverRow.style.outlineOffset = '-2px'; hoverRow.style.borderRadius = '10px'; }
+  if (hoverRow) { hoverRow.style.outline = '2px solid #ff5d8f'; hoverRow.style.outlineOffset = '-2px'; hoverRow.style.borderRadius = '10px'; }
 }
 function onPickMove(e) { const r = rowOf(e.target); setHover(isSongRow(r) ? r : null); }
 function onPickDown(e) { if (isSongRow(rowOf(e.target))) { e.preventDefault(); e.stopPropagation(); } }
@@ -205,27 +96,6 @@ function setPickMode(on) {
 }
 try { ipcRenderer.on('kw-pick-mode', (_e, on) => setPickMode(on)); } catch {}
 
-/* ---------- SPA route-change detection (reset list on page change) ---------- */
-let lastUrl = location.href;
-function checkUrl() {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    try { ipcRenderer.sendToHost('suno-reset'); } catch {}
-    setTimeout(scanDom, 400); setTimeout(scanDom, 1200); setTimeout(scanDom, 2500);
-  }
-}
-try {
-  const _push = history.pushState; history.pushState = function () { const r = _push.apply(this, arguments); checkUrl(); return r; };
-  const _replace = history.replaceState; history.replaceState = function () { const r = _replace.apply(this, arguments); checkUrl(); return r; };
-  window.addEventListener('popstate', checkUrl);
-} catch {}
-
 /* ---------- run ---------- */
-function start() {
-  try { ipcRenderer.sendToHost('suno-ready'); } catch {}
-  scanDom();
-  setInterval(scanDom, 1800);
-  setInterval(checkUrl, 900);
-  try { new MutationObserver(() => { clearTimeout(window.__kwScan); window.__kwScan = setTimeout(scanDom, 600); }).observe(document.documentElement, { childList: true, subtree: true }); } catch {}
-}
+function start() { try { ipcRenderer.sendToHost('suno-ready'); } catch {} }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
