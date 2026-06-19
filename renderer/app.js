@@ -1055,7 +1055,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     useEffect2(() => {
       api2.onMaximizeState && api2.onMaximizeState(setMax);
     }, []);
-    return /* @__PURE__ */ React.createElement("div", { className: "titlebar" }, /* @__PURE__ */ React.createElement("div", { className: "brand" }, /* @__PURE__ */ React.createElement("span", { className: "heart" }, "\u2665"), " Suno Kawaii Player"), /* @__PURE__ */ React.createElement("div", { className: "spacer" }), /* @__PURE__ */ React.createElement("div", { className: "win-btns" }, /* @__PURE__ */ React.createElement("button", { className: "win-btn", title: "Minimize", onClick: () => api2.minimize() }, "\u2014"), /* @__PURE__ */ React.createElement("button", { className: "win-btn", title: "Maximize", onClick: () => api2.maximize() }, max ? "\u2750" : "\u25A2"), /* @__PURE__ */ React.createElement("button", { className: "win-btn close", title: "Close", onClick: () => api2.close() }, "\u2715")));
+    return /* @__PURE__ */ React.createElement("div", { className: "titlebar" }, /* @__PURE__ */ React.createElement("div", { className: "brand" }, /* @__PURE__ */ React.createElement("span", { className: "heart" }, "\u2665"), " Suno Kawaii Player"), /* @__PURE__ */ React.createElement("button", { className: "social-link", title: "Feris socials \u2014 mez.ink/ferisooo", onClick: () => api2.openExternal("https://mez.ink/ferisooo") }, "\u{1F517} feris socials"), /* @__PURE__ */ React.createElement("div", { className: "spacer" }), /* @__PURE__ */ React.createElement("div", { className: "win-btns" }, /* @__PURE__ */ React.createElement("button", { className: "win-btn", title: "Minimize", onClick: () => api2.minimize() }, "\u2014"), /* @__PURE__ */ React.createElement("button", { className: "win-btn", title: "Maximize", onClick: () => api2.maximize() }, max ? "\u2750" : "\u25A2"), /* @__PURE__ */ React.createElement("button", { className: "win-btn close", title: "Close", onClick: () => api2.close() }, "\u2715")));
   }
   function TrackRow({ track, index, active, playing, onPlay, onMenu, selectable, checked, onToggle }) {
     return /* @__PURE__ */ React.createElement(
@@ -1107,6 +1107,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const [creationMounted, setCreationMounted] = useState2(false);
     const [actionsOpen, setActionsOpen] = useState2(false);
     const [bigViz, setBigViz] = useState2(false);
+    const [search, setSearch] = useState2("");
     const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
     const urlCache = useRef(/* @__PURE__ */ new Map()), vizRef = useRef(null);
     const audioCtxRef = useRef(null), analyserRef = useRef(null);
@@ -1172,9 +1173,11 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
       }
     }
     useEffect2(() => {
+      const root = document.documentElement;
       const bars = vizRef.current ? vizRef.current.children : [];
       if (!playing) {
         for (let i = 0; i < bars.length; i++) bars[i].style.height = "8px";
+        root.style.setProperty("--beat", "0");
         return;
       }
       let raf, data = null;
@@ -1201,9 +1204,17 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
           const v = Math.min(1, peak / 255 * (1 + i / n * 0.65));
           bars[i].style.height = 10 + v * span + "px";
         }
+        const beatLim = Math.floor(bins * 0.32);
+        let sum = 0;
+        for (let j = 2; j < beatLim; j++) sum += data[j];
+        const beat = Math.min(1, sum / Math.max(1, beatLim - 2) / 165);
+        root.style.setProperty("--beat", beat.toFixed(3));
       };
       raf = requestAnimationFrame(draw);
-      return () => cancelAnimationFrame(raf);
+      return () => {
+        cancelAnimationFrame(raf);
+        root.style.setProperty("--beat", "0");
+      };
     }, [playing, bigViz]);
     const resolveUrl = useCallback2(async (track) => {
       if (urlCache.current.has(track.id)) return urlCache.current.get(track.id);
@@ -1447,7 +1458,9 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const repeatOn = repeat !== "off";
     const curPl = playlists.find((p) => p.id === selPl);
     const selectable = tab === "library" || tab === "playlists" && curPl;
-    const listRows = useMemo2(() => list.map((t, i) => /* @__PURE__ */ React.createElement(
+    const q = search.trim().toLowerCase();
+    const shownList = useMemo2(() => tab === "library" && q ? list.filter((t) => (t.title || "").toLowerCase().includes(q)) : list, [tab, q, list]);
+    const listRows = useMemo2(() => shownList.map((t, i) => /* @__PURE__ */ React.createElement(
       TrackRow,
       {
         key: t.id,
@@ -1455,20 +1468,20 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
         index: i,
         active: t.id === curId,
         playing,
-        onPlay: () => playFrom(list, i),
+        onPlay: () => playFrom(shownList, i),
         onMenu: openMenu(t),
         selectable: true,
         checked: selected.includes(t.id),
         onToggle: () => toggleSel(t.id)
       }
-    )), [list, curId, playing, selected, playFrom]);
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TitleBar, null), /* @__PURE__ */ React.createElement("button", { className: "collapse-handle" + (collapsed ? " collapsed" : ""), title: collapsed ? "Show list" : "Hide list", onClick: () => setCollapsed((c) => !c) }, collapsed ? "\u25B6" : "\u25C0"), /* @__PURE__ */ React.createElement("div", { className: "workspace" + (collapsed ? " collapsed" : "") }, /* @__PURE__ */ React.createElement("aside", { className: "sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "tabs" }, /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "library" ? " active" : ""), onClick: () => setTab("library") }, "\u{1F3B5} Library"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "playlists" ? " active" : ""), onClick: () => setTab("playlists") }, "\u{1F4C3} Playlists"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "explore" ? " active" : ""), onClick: () => {
+    )), [shownList, curId, playing, selected, playFrom]);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(TitleBar, null), /* @__PURE__ */ React.createElement("button", { className: "collapse-handle" + (collapsed ? " collapsed" : ""), title: collapsed ? "Show list" : "Hide list", onClick: () => setCollapsed((c) => !c) }, collapsed ? "\u25B6" : "\u25C0"), /* @__PURE__ */ React.createElement("div", { className: "workspace" + (collapsed ? " collapsed" : "") + (playing ? " audio-live" : "") }, /* @__PURE__ */ React.createElement("aside", { className: "sidebar" }, /* @__PURE__ */ React.createElement("div", { className: "tabs" }, /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "library" ? " active" : ""), onClick: () => setTab("library") }, "\u{1F3B5} Library"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "playlists" ? " active" : ""), onClick: () => setTab("playlists") }, "\u{1F4C3} Playlists"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "explore" ? " active" : ""), onClick: () => {
       setTab("explore");
       setEmbedded(true);
     } }, "\u{1F31F} Explore"), /* @__PURE__ */ React.createElement("div", { className: "tab" + (tab === "creation" ? " active" : ""), onClick: () => {
       setTab("creation");
       setCreationMounted(true);
-    } }, "\u{1F3A8} Create")), tab === "library" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "Your songs ", /* @__PURE__ */ React.createElement("small", null, tracks.length)), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (actionsOpen ? " hot" : ""), title: "Import / backup / restore", onClick: () => setActionsOpen((o) => !o) }, actionsOpen ? "\u25B4 tools" : "\u25BE tools")), actionsOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: importSunoPlaylist }, "\u2B07 Import from my Suno songs"), /* @__PURE__ */ React.createElement("div", { className: "sub-actions" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", title: "Save all your imported songs + playlists to a .json file you pick", onClick: async () => {
+    } }, "\u{1F3A8} Create")), tab === "library" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "search-box" }, /* @__PURE__ */ React.createElement("span", { className: "search-ic" }, "\u{1F50D}"), /* @__PURE__ */ React.createElement("input", { className: "search-input", value: search, placeholder: "Search your songs\u2026", onChange: (e) => setSearch(e.target.value) }), search && /* @__PURE__ */ React.createElement("button", { className: "search-clear", title: "Clear", onClick: () => setSearch("") }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "Your songs ", /* @__PURE__ */ React.createElement("small", null, q ? shownList.length + " / " + tracks.length : tracks.length)), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (actionsOpen ? " hot" : ""), title: "Import / backup / restore", onClick: () => setActionsOpen((o) => !o) }, actionsOpen ? "\u25B4 tools" : "\u25BE tools")), actionsOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: importSunoPlaylist }, "\u2B07 Import from my Suno songs"), /* @__PURE__ */ React.createElement("div", { className: "sub-actions" }, /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", title: "Save all your imported songs + playlists to a .json file you pick", onClick: async () => {
       const ok = await api2.exportLibrary();
       if (ok) flash("Library backed up \u{1F4BE}");
     } }, "\u{1F4BE} Backup"), /* @__PURE__ */ React.createElement("button", { className: "ghost-btn", title: "Load songs + playlists back from a backup .json (merges \u2014 no duplicates)", onClick: async () => {
@@ -1511,7 +1524,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     } }, list.length && list.every((t) => selected.includes(t.id)) ? "\u2713 none" : "\u2713 all"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: downloadSel }, "\u2B07 Download"), /* @__PURE__ */ React.createElement("div", { className: "movewrap", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setPlMenuOpen((o) => !o) }, "\u{1F4C3} Move \u25BE"), plMenuOpen && /* @__PURE__ */ React.createElement("div", { className: "movemenu" }, playlists.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "ctx-empty" }, "No playlists"), playlists.map((p) => /* @__PURE__ */ React.createElement("button", { key: p.id, className: "ctx-item", onClick: () => moveSel(p.id, p.name) }, GLYPHS[p.name.length % GLYPHS.length], " ", p.name)), /* @__PURE__ */ React.createElement("button", { className: "ctx-item", onClick: async () => {
       const p = await api2.createPlaylist("Playlist " + (playlists.length + 1));
       if (p) moveSel(p.id, p.name);
-    } }, "\uFF0B New playlist"))), /* @__PURE__ */ React.createElement("button", { className: "sel-act danger", onClick: removeSel }, "\u{1F5D1}"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setSelected([]) }, "\u2715")), (tab === "library" || tab === "playlists" && curPl) && /* @__PURE__ */ React.createElement("div", { className: "tracklist" }, list.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, tab === "playlists" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Empty playlist \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Select songs in Library \u2192 Move here.") : /* @__PURE__ */ React.createElement(React.Fragment, null, "No songs yet \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Import from your Suno playlists or Explore.")), listRows)), /* @__PURE__ */ React.createElement("main", { className: "stage" }, /* @__PURE__ */ React.createElement("div", { className: "stage-inner" }, /* @__PURE__ */ React.createElement("div", { className: "now-view", style: { display: tab === "explore" || tab === "creation" ? "none" : "flex" } }, /* @__PURE__ */ React.createElement("button", { className: "viz-toggle" + (bigViz ? " on" : ""), title: bigViz ? "Show album art" : "Enlarge visualizer", onClick: () => setBigViz((v) => !v) }, bigViz ? "\u{1F5BC}" : "\u{1F4CA}"), /* @__PURE__ */ React.createElement("section", { className: "now" + (bigViz ? " big-viz" : "") }, /* @__PURE__ */ React.createElement("div", { className: "art-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "art-ring" + (playing ? " live" : "") }), /* @__PURE__ */ React.createElement("div", { className: "art" }, current && current.cover ? /* @__PURE__ */ React.createElement("img", { src: current.cover, alt: "" }) : /* @__PURE__ */ React.createElement("div", { className: "art-glyph" }, current ? "\u{1F3B5}" : "\u{1F3A7}"))), /* @__PURE__ */ React.createElement("div", { className: "now-meta" }, /* @__PURE__ */ React.createElement("div", { className: "now-kicker" }, playing ? "Now Playing" : current ? "Paused" : "Ready"), /* @__PURE__ */ React.createElement("div", { className: "now-title glow" }, current ? current.title : "Pick a song to begin"), /* @__PURE__ */ React.createElement("div", { className: "now-sub" }, current ? "Suno AI track" : "Your kawaii music corner \u{1F380}"), /* @__PURE__ */ React.createElement("div", { className: "viz", ref: vizRef }, Array.from({ length: bigViz ? 56 : 28 }).map((_, i) => /* @__PURE__ */ React.createElement("span", { key: i })))))), embedded && /* @__PURE__ */ React.createElement("div", { className: "suno-embed", style: { display: tab === "explore" ? "flex" : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "embed-nav" }, /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/explore") }, "\u{1F31F} Explore"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/me") }, "\u{1F511} My songs"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
+    } }, "\uFF0B New playlist"))), /* @__PURE__ */ React.createElement("button", { className: "sel-act danger", onClick: removeSel }, "\u{1F5D1}"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setSelected([]) }, "\u2715")), (tab === "library" || tab === "playlists" && curPl) && /* @__PURE__ */ React.createElement("div", { className: "tracklist" }, shownList.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, q ? /* @__PURE__ */ React.createElement(React.Fragment, null, "No songs match \u201C", search, "\u201D \u{1F50D}") : tab === "playlists" ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Empty playlist \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Select songs in Library \u2192 Move here.") : /* @__PURE__ */ React.createElement(React.Fragment, null, "No songs yet \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Import from your Suno playlists or Explore.")), listRows)), /* @__PURE__ */ React.createElement("main", { className: "stage" }, /* @__PURE__ */ React.createElement("div", { className: "stage-inner" }, /* @__PURE__ */ React.createElement("div", { className: "now-view", style: { display: tab === "explore" || tab === "creation" ? "none" : "flex" } }, /* @__PURE__ */ React.createElement("button", { className: "viz-toggle" + (bigViz ? " on" : ""), title: bigViz ? "Show album art" : "Enlarge visualizer", onClick: () => setBigViz((v) => !v) }, bigViz ? "\u{1F5BC}" : "\u{1F4CA}"), /* @__PURE__ */ React.createElement("section", { className: "now" + (bigViz ? " big-viz" : "") }, /* @__PURE__ */ React.createElement("div", { className: "art-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "art-ring" + (playing ? " live" : "") }), /* @__PURE__ */ React.createElement("div", { className: "art" }, current && current.cover ? /* @__PURE__ */ React.createElement("img", { src: current.cover, alt: "" }) : /* @__PURE__ */ React.createElement("div", { className: "art-glyph" }, current ? "\u{1F3B5}" : "\u{1F3A7}"))), /* @__PURE__ */ React.createElement("div", { className: "now-meta" }, /* @__PURE__ */ React.createElement("div", { className: "now-kicker" }, playing ? "Now Playing" : current ? "Paused" : "Ready"), /* @__PURE__ */ React.createElement("div", { className: "now-title glow" }, current ? current.title : "Pick a song to begin"), /* @__PURE__ */ React.createElement("div", { className: "now-sub" }, current ? "Suno AI track" : "Your kawaii music corner \u{1F380}"), /* @__PURE__ */ React.createElement("div", { className: "viz", ref: vizRef }, Array.from({ length: bigViz ? 56 : 28 }).map((_, i) => /* @__PURE__ */ React.createElement("span", { key: i })))))), embedded && /* @__PURE__ */ React.createElement("div", { className: "suno-embed", style: { display: tab === "explore" ? "flex" : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "embed-nav" }, /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/explore") }, "\u{1F31F} Explore"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/me") }, "\u{1F511} My songs"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
       const w = webviewRef.current;
       if (w && w.canGoBack && w.canGoBack()) w.goBack();
     } }, "\u2190"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {

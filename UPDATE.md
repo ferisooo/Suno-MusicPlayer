@@ -2,7 +2,14 @@
 
 Newest first, grouped by day. Short notes only.
 
-## 2026-06-19 — v1.3.6
+## 2026-06-19 — v1.3.7
+- Added: a **tiny search box above "Your songs"** that filters the library in
+  realtime as you type (count shows matches / total; ✕ clears).
+- Added: **"🔗 feris socials"** next to the app name in the titlebar → opens
+  mez.ink/ferisooo in your browser.
+- Added: **buttons pulse with the music** — while a song plays, the controls,
+  tabs and sidebar buttons brighten/darken in time with the beat (driven by the
+  visualizer's audio level). Steady when nothing's playing.
 - Fixed: **visualizer now uses all its bars.** It mapped frequency bins 1:1, so the
   low end hogged the left bars and the right ones stayed flat. Now the analyser has
   more resolution and bars are spread across the spectrum on a log scale (peak per

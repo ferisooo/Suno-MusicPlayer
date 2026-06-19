@@ -551,3 +551,55 @@ body::after {
 }
 @keyframes dotpulse { 0%,100% { opacity: 1; transform: translateY(-50%) scale(1); } 50% { opacity: .5; transform: translateY(-50%) scale(.7); } }
 .track { position: relative; }
+
+/* ============================================================
+   v1.3.7 — song search · socials · audio-reactive buttons
+   ============================================================ */
+
+/* realtime song search */
+.search-box {
+  display: flex; align-items: center; gap: 8px; margin: 10px 14px 2px;
+  padding: 7px 12px; border-radius: 12px;
+  background: rgba(11,7,16,0.6); border: 1px solid var(--line);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.search-box:focus-within { border-color: var(--hotpink); box-shadow: 0 0 0 3px rgba(255,93,143,0.16); }
+.search-ic { font-size: 12px; opacity: .8; }
+.search-input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  color: var(--cloud); font-family: var(--body); font-size: 13px; user-select: text;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-clear {
+  flex: none; cursor: pointer; border: none; background: transparent;
+  color: var(--muted); font-size: 13px; padding: 2px 4px; border-radius: 6px;
+  transition: color .15s ease, transform .12s ease;
+}
+.search-clear:hover { color: var(--hotpink); transform: scale(1.15); }
+
+/* "feris socials" link in the titlebar */
+.social-link {
+  -webkit-app-region: no-drag; cursor: pointer; margin-left: 12px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+  background: linear-gradient(135deg, rgba(255,93,143,0.18), rgba(255,206,71,0.12));
+  color: var(--cloud); font-family: var(--body); font-weight: 600; font-size: 11.5px;
+  display: inline-flex; align-items: center; gap: 5px;
+  text-shadow: 0 0 10px rgba(255,93,143,0.4);
+  transition: transform .16s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+}
+.social-link:hover { transform: translateY(-1px); color: #fff; background: linear-gradient(135deg, var(--hotpink), var(--lemon)); box-shadow: 0 6px 18px rgba(255,93,143,0.5); }
+.social-link:active { transform: scale(.95); }
+
+/* audio-reactive buttons: brightness pulses with the song (--beat is set per frame
+   by the visualizer loop, 0 = quiet/dark, 1 = loud/light). Only while a song plays. */
+:root { --beat: 0; }
+.workspace.audio-live .ctl,
+.workspace.audio-live .pill-btn,
+.workspace.audio-live .ghost-btn,
+.workspace.audio-live .connect-btn,
+.workspace.audio-live .tab,
+.workspace.audio-live .sel-act,
+.workspace.audio-live .viz-toggle,
+.workspace.audio-live .imp-btn {
+  filter: brightness(calc(0.6 + var(--beat) * 0.85));
+}

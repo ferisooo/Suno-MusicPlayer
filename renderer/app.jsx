@@ -52,6 +52,7 @@ function TitleBar() {
   return (
     <div className="titlebar">
       <div className="brand"><span className="heart">♥</span> Suno Kawaii Player</div>
+      <button className="social-link" title="Feris socials — mez.ink/ferisooo" onClick={() => api.openExternal('https://mez.ink/ferisooo')}>🔗 feris socials</button>
       <div className="spacer" />
       <div className="win-btns">
         <button className="win-btn" title="Minimize" onClick={() => api.minimize()}>—</button>
@@ -109,6 +110,7 @@ function App() {
   const [creationMounted, setCreationMounted] = useState(false);   // lazy-mount the Creation tab
   const [actionsOpen, setActionsOpen] = useState(false);           // library: import/backup/restore dropdown
   const [bigViz, setBigViz] = useState(false);                     // now-playing: hide art, enlarge visualizer
+  const [search, setSearch] = useState('');                        // library: realtime song search
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null);
@@ -145,8 +147,9 @@ function App() {
 
   /* ---- visualizer (only animates while playing; idle = flat, no loop) ---- */
   useEffect(() => {
+    const root = document.documentElement;
     const bars = vizRef.current ? vizRef.current.children : [];
-    if (!playing) { for (let i = 0; i < bars.length; i++) bars[i].style.height = '8px'; return; }
+    if (!playing) { for (let i = 0; i < bars.length; i++) bars[i].style.height = '8px'; root.style.setProperty('--beat', '0'); return; }
     let raf, data = null; const FRAME = 1000 / 60; let last = 0;
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
@@ -172,9 +175,14 @@ function App() {
         const v = Math.min(1, (peak / 255) * (1 + (i / n) * 0.65));
         bars[i].style.height = (10 + v * span) + 'px';
       }
+      // overall beat energy (bass/low-mids carry the pulse) → drives button brightness
+      const beatLim = Math.floor(bins * 0.32); let sum = 0;
+      for (let j = 2; j < beatLim; j++) sum += data[j];
+      const beat = Math.min(1, (sum / Math.max(1, beatLim - 2)) / 165);
+      root.style.setProperty('--beat', beat.toFixed(3));
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); root.style.setProperty('--beat', '0'); };
   }, [playing, bigViz]);
 
   /* ---- playback ---- */
@@ -278,20 +286,24 @@ function App() {
 
   const selectable = tab === 'library' || (tab === 'playlists' && curPl);
 
+  // realtime search filter (library only) — recomputed only when query/list/tab change
+  const q = search.trim().toLowerCase();
+  const shownList = useMemo(() => (tab === 'library' && q) ? list.filter((t) => (t.title || '').toLowerCase().includes(q)) : list, [tab, q, list]);
+
   // Build the rows once and reuse them across playback-progress re-renders, so a
   // 400-song list doesn't reconcile on every tick. (CSS content-visibility skips
   // painting off-screen rows, which keeps scrolling smooth.)
-  const listRows = useMemo(() => list.map((t, i) => (
+  const listRows = useMemo(() => shownList.map((t, i) => (
     <TrackRow key={t.id} track={t} index={i} active={t.id === curId} playing={playing}
-              onPlay={() => playFrom(list, i)} onMenu={openMenu(t)}
+              onPlay={() => playFrom(shownList, i)} onMenu={openMenu(t)}
               selectable checked={selected.includes(t.id)} onToggle={() => toggleSel(t.id)} />
-  )), [list, curId, playing, selected, playFrom]);
+  )), [shownList, curId, playing, selected, playFrom]);
 
   return (
     <>
       <TitleBar />
       <button className={'collapse-handle' + (collapsed ? ' collapsed' : '')} title={collapsed ? 'Show list' : 'Hide list'} onClick={() => setCollapsed((c) => !c)}>{collapsed ? '▶' : '◀'}</button>
-      <div className={'workspace' + (collapsed ? ' collapsed' : '')}>
+      <div className={'workspace' + (collapsed ? ' collapsed' : '') + (playing ? ' audio-live' : '')}>
         {/* ---------- sidebar ---------- */}
         <aside className="sidebar">
           <div className="tabs">
@@ -303,8 +315,13 @@ function App() {
 
           {tab === 'library' && (
             <>
+              <div className="search-box">
+                <span className="search-ic">🔍</span>
+                <input className="search-input" value={search} placeholder="Search your songs…" onChange={(e) => setSearch(e.target.value)} />
+                {search && <button className="search-clear" title="Clear" onClick={() => setSearch('')}>✕</button>}
+              </div>
               <div className="side-head">
-                <div className="side-title">Your songs <small>{tracks.length}</small></div>
+                <div className="side-title">Your songs <small>{q ? shownList.length + ' / ' + tracks.length : tracks.length}</small></div>
                 <button className={'pill-btn' + (actionsOpen ? ' hot' : '')} title="Import / backup / restore" onClick={() => setActionsOpen((o) => !o)}>{actionsOpen ? '▴ tools' : '▾ tools'}</button>
               </div>
               {actionsOpen && (
@@ -390,7 +407,7 @@ function App() {
 
           {(tab === 'library' || (tab === 'playlists' && curPl)) && (
             <div className="tracklist">
-              {list.length === 0 && <div className="empty-note">{tab === 'playlists' ? <>Empty playlist 🌸<br/>Select songs in Library → Move here.</> : <>No songs yet 🌸<br/>Import from your Suno playlists or Explore.</>}</div>}
+              {shownList.length === 0 && <div className="empty-note">{q ? <>No songs match “{search}” 🔍</> : tab === 'playlists' ? <>Empty playlist 🌸<br/>Select songs in Library → Move here.</> : <>No songs yet 🌸<br/>Import from your Suno playlists or Explore.</>}</div>}
               {listRows}
             </div>
           )}
