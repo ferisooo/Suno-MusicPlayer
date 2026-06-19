@@ -189,7 +189,8 @@ body::after {
   padding: 13px 14px; margin: 6px 2px; border-radius: 15px;
   cursor: pointer; position: relative; overflow: hidden;
   transition: transform .16s ease, background .2s ease;
-  animation: slidein .45s cubic-bezier(.2,.8,.2,1) both;
+  content-visibility: auto;            /* skip layout/paint for off-screen rows → smooth scroll on long lists */
+  contain-intrinsic-size: auto 66px;   /* placeholder height so the scrollbar stays stable */
 }
 .track:hover { background: rgba(255,126,194,0.12); transform: translateX(4px); }
 .track.active {
@@ -402,16 +403,20 @@ body::after {
 .titlebar .brand { text-shadow: 0 0 18px rgba(255,93,143,0.5), 0 0 8px rgba(255,206,71,0.3); animation: brandglow 4s ease-in-out infinite; }
 @keyframes brandglow { 0%,100% { filter: drop-shadow(0 0 6px rgba(255,93,143,0.3)); } 50% { filter: drop-shadow(0 0 14px rgba(255,206,71,0.5)); } }
 
-/* collapse rail button */
-.rail-btn {
-  -webkit-app-region: no-drag; cursor: pointer; margin-right: 4px;
-  width: 28px; height: 28px; border-radius: 9px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.06); color: var(--bubblegum); font-size: 12px;
-  display: grid; place-items: center;
-  transition: transform .16s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+/* collapse handle — a floating drawer tab at the left edge (was an awkward top-left button) */
+.collapse-handle {
+  position: fixed; top: 50%; left: 331px; transform: translateY(-50%);
+  z-index: 60; -webkit-app-region: no-drag; cursor: pointer;
+  width: 24px; height: 64px; border-radius: 12px;
+  border: 1px solid var(--line); background: rgba(20,12,18,0.86);
+  color: var(--bubblegum); font-size: 13px; display: grid; place-items: center;
+  box-shadow: var(--shadow-pink); backdrop-filter: blur(6px);
+  transition: left .32s cubic-bezier(.2,.8,.2,1), background .2s ease, box-shadow .2s ease, color .2s ease, transform .12s ease;
 }
-.rail-btn:hover { transform: translateX(-2px); background: rgba(255,126,194,0.4); color: #fff; box-shadow: var(--shadow-pink); }
-.rail-btn:active { transform: scale(.9); }
+.collapse-handle.collapsed { left: 8px; }
+.collapse-handle:hover { background: rgba(255,93,143,0.42); color: #fff; box-shadow: 0 6px 22px rgba(255,93,143,0.6); }
+.collapse-handle:active { transform: translateY(-50%) scale(.9); }
+@media (max-width: 980px) { .collapse-handle { display: none; } }
 
 /* collapsible sidebar */
 .workspace { transition: grid-template-columns .34s cubic-bezier(.2,.8,.2,1); }

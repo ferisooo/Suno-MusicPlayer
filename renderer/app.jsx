@@ -1,6 +1,6 @@
 /* app.jsx — Suno Kawaii Player UI (source). Compiled to app.js by build.js. */
 import { CreationTab } from './creation.jsx';
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const api = window.kawaii;
 
 const fmt = (s) => { if (!s || !isFinite(s)) return '0:00'; const m = Math.floor(s / 60); const ss = Math.floor(s % 60).toString().padStart(2, '0'); return m + ':' + ss; };
@@ -46,12 +46,11 @@ function useCosmetics() {
 }
 
 /* ===================== titlebar ===================== */
-function TitleBar({ collapsed, onToggle }) {
+function TitleBar() {
   const [max, setMax] = useState(false);
   useEffect(() => { api.onMaximizeState && api.onMaximizeState(setMax); }, []);
   return (
     <div className="titlebar">
-      <button className="rail-btn" title={collapsed ? 'Show list' : 'Hide list'} onClick={onToggle}>{collapsed ? '▶' : '◀'}</button>
       <div className="brand"><span className="heart">♥</span> Suno Kawaii Player</div>
       <div className="spacer" />
       <div className="win-btns">
@@ -108,6 +107,7 @@ function App() {
   const [plMenuOpen, setPlMenuOpen] = useState(false);
   const [picking, setPicking] = useState(false);   // explore: click-a-song-to-add mode
   const [creationMounted, setCreationMounted] = useState(false);   // lazy-mount the Creation tab
+  const [actionsOpen, setActionsOpen] = useState(false);           // library: import/backup/restore dropdown
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), lyricsRef = useRef(null);
@@ -272,9 +272,19 @@ function App() {
 
   const selectable = tab === 'library' || (tab === 'playlists' && curPl);
 
+  // Build the rows once and reuse them across playback-progress re-renders, so a
+  // 400-song list doesn't reconcile on every tick. (CSS content-visibility skips
+  // painting off-screen rows, which keeps scrolling smooth.)
+  const listRows = useMemo(() => list.map((t, i) => (
+    <TrackRow key={t.id} track={t} index={i} active={t.id === curId} playing={playing}
+              onPlay={() => playFrom(list, i)} onMenu={openMenu(t)}
+              selectable checked={selected.includes(t.id)} onToggle={() => toggleSel(t.id)} />
+  )), [list, curId, playing, selected, playFrom]);
+
   return (
     <>
-      <TitleBar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      <TitleBar />
+      <button className={'collapse-handle' + (collapsed ? ' collapsed' : '')} title={collapsed ? 'Show list' : 'Hide list'} onClick={() => setCollapsed((c) => !c)}>{collapsed ? '▶' : '◀'}</button>
       <div className={'workspace' + (collapsed ? ' collapsed' : '')}>
         {/* ---------- sidebar ---------- */}
         <aside className="sidebar">
@@ -289,12 +299,17 @@ function App() {
             <>
               <div className="side-head">
                 <div className="side-title">Your songs <small>{tracks.length}</small></div>
+                <button className={'pill-btn' + (actionsOpen ? ' hot' : '')} title="Import / backup / restore" onClick={() => setActionsOpen((o) => !o)}>{actionsOpen ? '▴ tools' : '▾ tools'}</button>
               </div>
-              <button className="connect-btn" onClick={importSunoPlaylist}>⬇ Import from my Suno songs</button>
-              <div className="sub-actions">
-                <button className="ghost-btn" title="Save all your imported songs + playlists to a .json file you pick" onClick={async () => { const ok = await api.exportLibrary(); if (ok) flash('Library backed up 💾'); }}>💾 Backup</button>
-                <button className="ghost-btn" title="Load songs + playlists back from a backup .json (merges — no duplicates)" onClick={async () => { const ok = await api.importLibrary(); flash(ok ? 'Library restored 💜' : 'Nothing restored.', !ok); }}>📂 Restore</button>
-              </div>
+              {actionsOpen && (
+                <>
+                  <button className="connect-btn" onClick={importSunoPlaylist}>⬇ Import from my Suno songs</button>
+                  <div className="sub-actions">
+                    <button className="ghost-btn" title="Save all your imported songs + playlists to a .json file you pick" onClick={async () => { const ok = await api.exportLibrary(); if (ok) flash('Library backed up 💾'); }}>💾 Backup</button>
+                    <button className="ghost-btn" title="Load songs + playlists back from a backup .json (merges — no duplicates)" onClick={async () => { const ok = await api.importLibrary(); flash(ok ? 'Library restored 💜' : 'Nothing restored.', !ok); }}>📂 Restore</button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
@@ -370,11 +385,7 @@ function App() {
           {(tab === 'library' || (tab === 'playlists' && curPl)) && (
             <div className="tracklist">
               {list.length === 0 && <div className="empty-note">{tab === 'playlists' ? <>Empty playlist 🌸<br/>Select songs in Library → Move here.</> : <>No songs yet 🌸<br/>Import from your Suno playlists or Explore.</>}</div>}
-              {list.map((t, i) => (
-                <TrackRow key={t.id + ':' + i} track={t} index={i} active={t.id === curId} playing={playing}
-                          onPlay={() => playFrom(list, i)} onMenu={openMenu(t)}
-                          selectable checked={selected.includes(t.id)} onToggle={() => toggleSel(t.id)} />
-              ))}
+              {listRows}
             </div>
           )}
         </aside>

@@ -2,6 +2,16 @@
 
 Newest first. Short notes only.
 
+## v1.3.3 — 2026-06-19
+- Perf: **big song lists (400+) scroll smoothly now.** Off-screen rows skip
+  layout/paint (`content-visibility`), the list is memoized so it doesn't
+  re-render on every playback tick, and the per-row entrance animation (which
+  re-fired while scrolling) is gone.
+- Library: **Import / Backup / Restore tucked behind a one-click "▾ tools"
+  dropdown**, so the song list gets the space.
+- Moved the **show/hide-list toggle off the top-left corner** to a floating handle
+  on the left edge (vertically centered), next to the panel it collapses.
+
 ## v1.3.2 — 2026-06-19
 - Perf: targeted optimizations for a steady 60fps.
   - Visualizer now only animates **while a song plays** (it used to run a loop
