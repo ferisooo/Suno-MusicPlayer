@@ -78,6 +78,22 @@ ipcMain.on('window:maximize', () => { if (mainWindow) mainWindow.isMaximized() ?
 ipcMain.on('window:close', () => mainWindow && mainWindow.close());
 ipcMain.on('open:external', (_e, url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); });
 
+/* ===================== update check (compares running version to UPDATE.md) ===================== */
+function cmpVer(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) > (pb[i] || 0)) return 1; if ((pa[i] || 0) < (pb[i] || 0)) return -1; }
+  return 0;
+}
+ipcMain.handle('update:check', async () => {
+  const current = app.getVersion();
+  try {
+    const txt = await fetchRaw('https://raw.githubusercontent.com/ferisooo/KawaiiSuno/main/UPDATE.md');
+    const m = txt.match(/##\s*\d{4}-\d{2}-\d{2}\s*[—-]\s*v(\d+\.\d+\.\d+)/);
+    const latest = m ? m[1] : null;
+    return { ok: true, current, latest, newer: latest ? cmpVer(latest, current) > 0 : false, url: 'https://github.com/ferisooo/KawaiiSuno' };
+  } catch (e) { return { ok: false, current, error: e.message }; }
+});
+
 /* ===================== settings (prefs / sort / favorites) ===================== */
 ipcMain.handle('settings:get', () => readConfig().settings || {});
 ipcMain.handle('settings:set', (_e, patch) => { const c = readConfig(); c.settings = Object.assign({}, c.settings, patch || {}); writeConfig(c); return c.settings; });

@@ -127,6 +127,7 @@ function App() {
   const [favOnly, setFavOnly] = useState(false);
   const [offlineCount, setOfflineCount] = useState(0);
   const [caching, setCaching] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);                // {current, latest, url}
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -154,6 +155,15 @@ function App() {
   /* ---- offline cache ---- */
   const refreshOffline = async () => { try { const l = api.offlineList && await api.offlineList(); setOfflineCount(Array.isArray(l) ? l.length : 0); } catch {} };
   useEffect(() => { refreshOffline(); }, []);
+
+  /* ---- update check (once, a couple seconds after launch) ---- */
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try { const u = api.checkUpdate && await api.checkUpdate(); if (u && u.newer && u.latest !== settingsRef.current.dismissedVersion) setUpdateInfo(u); } catch {}
+    }, 2500);
+    return () => clearTimeout(t);
+  }, []);
+  const dismissUpdate = () => { if (updateInfo) updateSettings({ dismissedVersion: updateInfo.latest }); setUpdateInfo(null); };
   const cacheAll = async () => {
     if (caching) return; setCaching(true);
     const items = tracks.filter((t) => t.audioUrl); let ok = 0, fail = 0;
@@ -656,6 +666,14 @@ function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {updateInfo && (
+        <div className="update-banner">
+          <span className="upd-spark">✨</span>
+          <span className="upd-msg">Update available — <b>v{updateInfo.latest}</b> <small>(you have v{updateInfo.current})</small></span>
+          <button className="upd-btn" onClick={() => api.openExternal(updateInfo.url)}>View</button>
+          <button className="upd-btn ghost" onClick={dismissUpdate}>Dismiss</button>
         </div>
       )}
       {toast && <div className={'toast' + (toast.err ? ' err' : '')}>{busy && <div className="spinner" />}<span>{toast.msg}</span></div>}

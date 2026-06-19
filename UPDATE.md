@@ -2,6 +2,11 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.11
+- Added: **in-app update check** — on launch the app reads the latest version from
+  UPDATE.md in the repo and, if it's newer than the running build, shows an
+  "Update available — View / Dismiss" banner. Dismiss is remembered per version.
+
 ## 2026-06-19 — v1.3.10
 - Added: **Offline cache** (Settings) — toggle to save songs to disk as you play
   them, plus "Cache all" to download your whole library for offline play, and

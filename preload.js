@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('kawaii', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 
+  // update check
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+
   // offline cache
   offlineGet: (id) => ipcRenderer.invoke('offline:get', id),
   offlineSave: (id, bytes) => ipcRenderer.invoke('offline:save', id, bytes),
