@@ -2,6 +2,13 @@
 
 Newest first. Short notes only.
 
+## v1.2.7 — 2026-06-19
+- Added: **🎯 Pick songs** in the Explore bar — a manual alternative to
+  auto-detection. Toggle it on, then click any song right in the Suno page to add
+  exactly that one (the row highlights pink on hover, flashes green when added,
+  and the click no longer navigates/plays). Toggle off to browse normally. Turns
+  off by itself when the page reloads.
+
 ## v1.2.6 — 2026-06-19
 - Fixed: **playlist / library songs weren't detected** — those rows aren't
   `/song/` links (the title navigates via JS), so anchor-only scraping missed

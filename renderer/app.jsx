@@ -96,6 +96,7 @@ function App() {
   const [onlyPlayed, setOnlyPlayed] = useState(false);
   const [selected, setSelected] = useState([]);   // library: selected track ids
   const [plMenuOpen, setPlMenuOpen] = useState(false);
+  const [picking, setPicking] = useState(false);   // explore: click-a-song-to-add mode
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), lyricsRef = useRef(null);
@@ -215,6 +216,8 @@ function App() {
   // Force the embedded Suno page to auto-scroll its (virtualized) library so EVERY
   // song loads — the harvester only sees rows that are actually rendered.
   const scanAll = () => { const w = webviewRef.current; if (w && w.send) { try { w.send('kw-deep-harvest'); flash('Scanning your whole library — sit tight 🔎'); } catch {} } };
+  // Manual pick mode: click a song right in the Suno pane to add exactly that one.
+  const togglePick = () => { const next = !picking; setPicking(next); const w = webviewRef.current; if (w && w.send) { try { w.send('kw-pick-mode', next); } catch {} } flash(next ? 'Pick mode on — click any song in the page to add it 🎯' : 'Pick mode off'); };
 
   useEffect(() => {
     if (!embedded) return; const wv = webviewRef.current; if (!wv) return;
@@ -241,9 +244,12 @@ function App() {
         const st = (e.args[0] || {}).state;
         if (st === 'start') flash('Loading your whole library… 🔎');
         else if (st === 'done') flash('Library scan done — everything\'s in the list 💜');
+      } else if (e.channel === 'suno-pick') {
+        const t = e.args[0];
+        if (t && t.id) { api.importTrack(t); flash('Added "' + String(t.title || 'song').slice(0, 28) + '" 💜'); }
       }
     };
-    const onNav = () => setPageTracks([]);
+    const onNav = () => { setPageTracks([]); setPicking(false); };   // page reload drops pick mode in-guest
     const onCrash = () => { try { wv.reload(); } catch {} };
     wv.addEventListener('dom-ready', onReady);
     wv.addEventListener('ipc-message', onMsg);
@@ -421,7 +427,8 @@ function App() {
                   <button className="pill-btn" onClick={() => navSuno('https://suno.com/me')}>🔑 My songs</button>
                   <button className="pill-btn" onClick={() => { const w = webviewRef.current; if (w && w.canGoBack && w.canGoBack()) w.goBack(); }}>←</button>
                   <button className="pill-btn" onClick={() => { const w = webviewRef.current; if (w && w.reload) w.reload(); }}>⟳</button>
-                  <span className="embed-hint">songs show in the list ← tap ＋ to import 💜</span>
+                  <button className={'pill-btn' + (picking ? ' hot' : '')} title="Click songs in the page to add them" onClick={togglePick}>{picking ? '🎯 Click a song…' : '🎯 Pick songs'}</button>
+                  <span className="embed-hint">{picking ? 'click any song in the page to add it 🎯' : 'songs show in the list ← tap ＋ to import 💜'}</span>
                 </div>
                 <webview ref={webviewRef} className="suno-webview" src={sunoStart} partition="persist:suno"
                          preload={api.sunoPreloadPath} webpreferences="contextIsolation=no,sandbox=no,nodeIntegration=no"></webview>

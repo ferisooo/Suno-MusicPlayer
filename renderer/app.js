@@ -137,6 +137,7 @@
     const [onlyPlayed, setOnlyPlayed] = useState(false);
     const [selected, setSelected] = useState([]);
     const [plMenuOpen, setPlMenuOpen] = useState(false);
+    const [picking, setPicking] = useState(false);
     const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
     const urlCache = useRef(/* @__PURE__ */ new Map()), vizRef = useRef(null), lyricsRef = useRef(null);
     const audioCtxRef = useRef(null), analyserRef = useRef(null);
@@ -409,6 +410,18 @@
         }
       }
     };
+    const togglePick = () => {
+      const next = !picking;
+      setPicking(next);
+      const w = webviewRef.current;
+      if (w && w.send) {
+        try {
+          w.send("kw-pick-mode", next);
+        } catch {
+        }
+      }
+      flash(next ? "Pick mode on \u2014 click any song in the page to add it \u{1F3AF}" : "Pick mode off");
+    };
     useEffect(() => {
       if (!embedded) return;
       const wv = webviewRef.current;
@@ -442,9 +455,18 @@
           const st = (e.args[0] || {}).state;
           if (st === "start") flash("Loading your whole library\u2026 \u{1F50E}");
           else if (st === "done") flash("Library scan done \u2014 everything's in the list \u{1F49C}");
+        } else if (e.channel === "suno-pick") {
+          const t = e.args[0];
+          if (t && t.id) {
+            api.importTrack(t);
+            flash('Added "' + String(t.title || "song").slice(0, 28) + '" \u{1F49C}');
+          }
         }
       };
-      const onNav = () => setPageTracks([]);
+      const onNav = () => {
+        setPageTracks([]);
+        setPicking(false);
+      };
       const onCrash = () => {
         try {
           wv.reload();
@@ -591,7 +613,7 @@
     } }, "\u2190"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
       const w = webviewRef.current;
       if (w && w.reload) w.reload();
-    } }, "\u27F3"), /* @__PURE__ */ React.createElement("span", { className: "embed-hint" }, "songs show in the list \u2190 tap \uFF0B to import \u{1F49C}")), /* @__PURE__ */ React.createElement(
+    } }, "\u27F3"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (picking ? " hot" : ""), title: "Click songs in the page to add them", onClick: togglePick }, picking ? "\u{1F3AF} Click a song\u2026" : "\u{1F3AF} Pick songs"), /* @__PURE__ */ React.createElement("span", { className: "embed-hint" }, picking ? "click any song in the page to add it \u{1F3AF}" : "songs show in the list \u2190 tap \uFF0B to import \u{1F49C}")), /* @__PURE__ */ React.createElement(
       "webview",
       {
         ref: webviewRef,
