@@ -2,6 +2,16 @@
 
 Newest first. Short notes only.
 
+## v1.2.5 — 2026-06-19
+- Changed: **the player bar now hides while you're in Explore**, so the embedded
+  Suno page fills the whole stage and is much bigger to browse. It comes back the
+  moment you switch to Library/Playlists (playback keeps going in the background).
+- Added: **"🔎 Find all my songs"** in Explore. Suno's lists are virtualized — only
+  the rows on screen exist in the page — so the old scrape only caught the first
+  screenful. This auto-scrolls your whole library so every song loads and gets
+  harvested (titles/covers/lyrics from the page's own feed calls). It also runs
+  automatically when you land on your "My songs" page.
+
 ## v1.2.4 — 2026-06-19
 - Fixed: **import list now refreshes when you move between pages inside Suno**
   (Explore ↔ Library). Detects Suno's in-app route changes and resets + rescans.

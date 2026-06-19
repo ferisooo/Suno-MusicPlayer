@@ -212,6 +212,9 @@ function App() {
   const importSunoPlaylist = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Open a playlist, then right-click songs (or ⬇ import all) 🎀'); };
   const connect = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Log into Suno below — it\'s remembered after 🔑'); };
   const chromeLogin = async () => { setBusy(true); flash('Trying to import your Chrome login… 🔑'); try { const r = await api.chromeLogin(); flash(r.ok ? ('Imported ' + r.count + ' cookies — you should be logged in 💜') : r.message, !r.ok); if (r.ok) { setEmbedded(true); setTab('explore'); } } catch (e) { flash('Chrome import failed.', true); } finally { setBusy(false); } };
+  // Force the embedded Suno page to auto-scroll its (virtualized) library so EVERY
+  // song loads — the harvester only sees rows that are actually rendered.
+  const scanAll = () => { const w = webviewRef.current; if (w && w.send) { try { w.send('kw-deep-harvest'); flash('Scanning your whole library — sit tight 🔎'); } catch {} } };
 
   useEffect(() => {
     if (!embedded) return; const wv = webviewRef.current; if (!wv) return;
@@ -234,6 +237,10 @@ function App() {
         flash('Connected to Suno 🎀');
       } else if (e.channel === 'suno-reset') {
         setPageTracks([]);
+      } else if (e.channel === 'suno-scan') {
+        const st = (e.args[0] || {}).state;
+        if (st === 'start') flash('Loading your whole library… 🔎');
+        else if (st === 'done') flash('Library scan done — everything\'s in the list 💜');
       }
     };
     const onNav = () => setPageTracks([]);
@@ -336,6 +343,7 @@ function App() {
             <>
               <div className="side-head"><div className="side-title">To import <small>{pageView.length}</small></div>
                 <button className={'pill-btn' + (onlyPlayed ? ' hot' : '')} onClick={() => setOnlyPlayed((v) => !v)}>{onlyPlayed ? '▶ played' : 'all'}</button></div>
+              <button className="connect-btn" onClick={scanAll}>🔎 Find all my songs</button>
               {pageView.length > 0 && <button className="connect-btn" onClick={() => { pageView.forEach((t) => api.importTrack(t)); flash('Imported ' + pageView.length + ' song' + (pageView.length > 1 ? 's' : '') + ' 💜'); }}>＋ Import these {pageView.length}</button>}
               <div className="tracklist">
                 {pageView.length === 0 && <div className="empty-note">{onlyPlayed ? <>Play the songs you want on the right ▶<br/>Only ones you play show here (toggle “played” off to see all).</> : <>Browse Suno on the right 🌸<br/>New songs appear here — tap ＋ to import.</>}</div>}
@@ -418,7 +426,8 @@ function App() {
             )}
           </div>
 
-          {/* ---------- transport ---------- */}
+          {/* ---------- transport (hidden while exploring → Suno fills the space) ---------- */}
+          {tab !== 'explore' && (
           <div className="transport">
             <div className="seek">
               <div className="time">{fmt(progress)}</div>
@@ -434,6 +443,7 @@ function App() {
               <div className="volwrap"><span style={{ fontSize: 15 }}>{volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}</span><div className="vol" onClick={setVol}><div className="vfill" style={{ width: (volume * 100) + '%' }} /></div></div>
             </div>
           </div>
+          )}
         </main>
       </div>
 
