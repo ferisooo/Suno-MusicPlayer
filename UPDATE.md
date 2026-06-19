@@ -2,6 +2,11 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.13
+- Changed: **visualizer bars are no longer capped low** — they climb much higher
+  and pass *behind* the song title / "NOW PLAYING" / subtitle as an underlay
+  (the text stays on top and readable), bounded only by the panel edge.
+
 ## 2026-06-19 — v1.3.12
 - Fixed: **the ⚙ settings gear is clickable now** — it sat in the titlebar's
   drag region, so the OS swallowed the clicks. Moved into the no-drag button group.
