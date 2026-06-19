@@ -108,6 +108,7 @@ function App() {
   const [picking, setPicking] = useState(false);   // explore: click-a-song-to-add mode
   const [creationMounted, setCreationMounted] = useState(false);   // lazy-mount the Creation tab
   const [actionsOpen, setActionsOpen] = useState(false);           // library: import/backup/restore dropdown
+  const [bigViz, setBigViz] = useState(false);                     // now-playing: hide art, enlarge visualizer
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), lyricsRef = useRef(null);
@@ -154,11 +155,12 @@ function App() {
       const an = analyserRef.current; if (!an) return;
       if (!data || data.length !== an.frequencyBinCount) data = new Uint8Array(an.frequencyBinCount);
       an.getByteFrequencyData(data);
-      for (let i = 0; i < bars.length; i++) bars[i].style.height = (10 + (data[i % data.length] / 255) * 130) + 'px';
+      const span = bigViz ? 260 : 130;   // taller bars when the visualizer is enlarged
+      for (let i = 0; i < bars.length; i++) bars[i].style.height = (10 + (data[i % data.length] / 255) * span) + 'px';
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [playing]);
+  }, [playing, bigViz]);
 
   /* ---- lyrics auto-scroll with progress ---- */
   const lyricLines = (current && current.lyrics ? String(current.lyrics).split(/\n+/).map((l) => l.trim()).filter(Boolean) : []);
@@ -394,7 +396,8 @@ function App() {
         <main className="stage">
           <div className="stage-inner">
             <div className="now-view" style={{ display: (tab === 'explore' || tab === 'creation') ? 'none' : 'flex' }}>
-              <section className="now">
+              <button className={'viz-toggle' + (bigViz ? ' on' : '')} title={bigViz ? 'Show album art' : 'Enlarge visualizer'} onClick={() => setBigViz((v) => !v)}>{bigViz ? '🖼' : '📊'}</button>
+              <section className={'now' + (bigViz ? ' big-viz' : '')}>
                 <div className="art-wrap">
                   <div className={'art-ring' + (playing ? ' live' : '')} />
                   <div className="art">{current && current.cover ? <img src={current.cover} alt="" /> : <div className="art-glyph">{current ? '🎵' : '🎧'}</div>}</div>
@@ -403,7 +406,7 @@ function App() {
                   <div className="now-kicker">{playing ? 'Now Playing' : (current ? 'Paused' : 'Ready')}</div>
                   <div className="now-title glow">{current ? current.title : 'Pick a song to begin'}</div>
                   <div className="now-sub">{current ? 'Suno AI track' : 'Your kawaii music corner 🎀'}</div>
-                  <div className="viz" ref={vizRef}>{Array.from({ length: 28 }).map((_, i) => <span key={i} />)}</div>
+                  <div className="viz" ref={vizRef}>{Array.from({ length: bigViz ? 56 : 28 }).map((_, i) => <span key={i} />)}</div>
                 </div>
               </section>
               {lyricLines.length > 0 && (

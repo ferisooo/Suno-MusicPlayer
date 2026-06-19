@@ -231,7 +231,25 @@ body::after {
   animation: rise .6s .08s cubic-bezier(.2,.8,.2,1) both;
 }
 .stage-inner { flex: 1; display: flex; flex-direction: column; padding: 26px 30px 8px; min-height: 0; }
-.now-view { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; min-height: 0; }
+.now-view { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; min-height: 0; }
+
+/* toggle: hide album art + enlarge the visualizer */
+.viz-toggle {
+  position: absolute; top: 2px; right: 2px; z-index: 5;
+  -webkit-app-region: no-drag; cursor: pointer;
+  width: 42px; height: 34px; border-radius: 11px;
+  border: 1px solid var(--line); background: rgba(255,255,255,0.06);
+  color: var(--bubblegum); font-size: 16px; display: grid; place-items: center;
+  transition: transform .16s ease, background .2s ease, box-shadow .2s ease, color .2s ease;
+}
+.viz-toggle:hover { transform: translateY(-1px); background: rgba(255,93,143,0.4); color: #fff; box-shadow: var(--shadow-pink); }
+.viz-toggle:active { transform: scale(.92); }
+.viz-toggle.on { background: linear-gradient(135deg, var(--hotpink), var(--lemon)); color: #2a0d1f; border-color: transparent; box-shadow: 0 6px 18px rgba(255,93,143,0.5); }
+
+.now.big-viz { gap: 0; }
+.now.big-viz .art-wrap { display: none; }
+.now.big-viz .now-meta { flex: 1; text-align: center; }
+.now.big-viz .viz { height: 280px; gap: 4px; margin-top: 26px; justify-content: center; }
 .suno-embed { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .embed-nav { display: flex; align-items: center; gap: 8px; }
 .embed-hint { margin-left: auto; color: var(--muted); font-size: 12px; }

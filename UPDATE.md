@@ -2,6 +2,11 @@
 
 Newest first. Short notes only.
 
+## v1.3.4 — 2026-06-19
+- Added: a **📊 toggle on the Now Playing view that hides the album art and
+  enlarges the visualizer** (taller bars, more of them, full width). Tap 🖼 to
+  bring the art back.
+
 ## v1.3.3 — 2026-06-19
 - Perf: **big song lists (400+) scroll smoothly now.** Off-screen rows skip
   layout/paint (`content-visibility`), the list is memoized so it doesn't
