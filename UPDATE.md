@@ -2,6 +2,22 @@
 
 Newest first. Short notes only.
 
+## v1.2.8 — 2026-06-19
+- Fixed: **select / select-all now shows the checkmark** (the row's checkbox was
+  wired to the wrong prop, so it never lit up or highlighted the row).
+- Fixed: **visualizer no longer dances when nothing's playing** — it rests flat
+  and only reacts to actual audio.
+- Changed: **visualizer is much bigger** (tall bars with a gold/rose glow).
+- Changed: **Chrome login** now scans *every* Chrome profile (not just Default /
+  Profile 1) and gives an accurate reason when it can't import — "close Chrome and
+  retry", "app-bound encryption", or "not signed in" — instead of always claiming
+  you're not logged in.
+- Removed: **"Find all my songs"** (the auto-scroll scan) — it was buggy. Use
+  **🎯 Pick songs** to click the ones you want; the list still fills as you browse.
+- Theme: retuned to **black · gold · rose-pink** — darker near-black panels,
+  rose/gold particles, trails, ripples and background, and stronger glowing
+  titles, kicker, brand and lyrics.
+
 ## v1.2.7 — 2026-06-19
 - Added: **🎯 Pick songs** in the Explore bar — a manual alternative to
   auto-detection. Toggle it on, then click any song right in the Suno page to add

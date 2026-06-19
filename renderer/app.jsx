@@ -10,7 +10,7 @@ function useCosmetics() {
   useEffect(() => {
     const pcv = document.getElementById('bg-particles'), tcv = document.getElementById('cursor-trail');
     const pctx = pcv.getContext('2d'), tctx = tcv.getContext('2d');
-    let raf; const COLORS = ['#ff7ec2', '#ffe066', '#ff4fa3', '#caa7ff'];
+    let raf; const COLORS = ['#ff5d8f', '#ffce47', '#ff86b3', '#e6ad1f'];
     function size() { for (const c of [pcv, tcv]) { c.width = innerWidth; c.height = innerHeight; } }
     size(); addEventListener('resize', size);
     const parts = Array.from({ length: 52 }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, r: 1 + Math.random() * 3, vx: (Math.random() - 0.5) * 0.35, vy: -0.2 - Math.random() * 0.5, a: 0.25 + Math.random() * 0.55, c: COLORS[(Math.random() * COLORS.length) | 0] }));
@@ -24,7 +24,7 @@ function useCosmetics() {
       for (const p of parts) { p.x += p.vx; p.y += p.vy; if (p.y < -10) { p.y = innerHeight + 10; p.x = Math.random() * innerWidth; } if (p.x < -10) p.x = innerWidth + 10; if (p.x > innerWidth + 10) p.x = -10; pctx.globalAlpha = p.a; pctx.fillStyle = p.c; pctx.beginPath(); pctx.arc(p.x, p.y, p.r, 0, 7); pctx.fill(); }
       pctx.globalAlpha = 1;
       tctx.clearRect(0, 0, tcv.width, tcv.height);
-      for (let i = 0; i < trail.length; i++) { const t = trail[i]; t.life *= 0.92; const rr = (i / trail.length) * 7 + 1; tctx.globalAlpha = t.life * 0.6; tctx.fillStyle = i % 2 ? '#ffe066' : '#ff7ec2'; tctx.beginPath(); tctx.arc(t.x, t.y, rr, 0, 7); tctx.fill(); }
+      for (let i = 0; i < trail.length; i++) { const t = trail[i]; t.life *= 0.92; const rr = (i / trail.length) * 7 + 1; tctx.globalAlpha = t.life * 0.6; tctx.fillStyle = i % 2 ? '#ffce47' : '#ff5d8f'; tctx.beginPath(); tctx.arc(t.x, t.y, rr, 0, 7); tctx.fill(); }
       tctx.globalAlpha = 1; raf = requestAnimationFrame(loop);
     }
     loop();
@@ -59,7 +59,7 @@ function TrackRow({ track, index, active, playing, onPlay, onMenu, selectable, c
       {track.cover
         ? <img className="thumb" src={track.cover} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
         : <div className="tnum">{active && playing ? <div className="eqbars"><span/><span/><span/><span/></div> : GLYPHS[index % GLYPHS.length]}</div>}
-      <div className="tmeta"><div className="tname">{track.title}</div><div className="tsrc">💜 Suno</div></div>
+      <div className="tmeta"><div className="tname">{track.title}</div><div className="tsrc">🌹 Suno</div></div>
       {active && playing && track.cover && <div className="eqbars" style={{ marginLeft: 'auto' }}><span/><span/><span/><span/></div>}
     </div>
   );
@@ -138,8 +138,8 @@ function App() {
     let raf;
     const draw = () => {
       const bars = vizRef.current ? vizRef.current.children : []; const an = analyserRef.current;
-      if (an && playing) { const data = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(data); for (let i = 0; i < bars.length; i++) bars[i].style.height = (6 + (data[i % data.length] / 255) * 58) + 'px'; }
-      else { for (let i = 0; i < bars.length; i++) bars[i].style.height = (6 + (Math.sin(Date.now() / 380 + i) + 1) * 5) + 'px'; }
+      if (an && playing) { const data = new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(data); for (let i = 0; i < bars.length; i++) bars[i].style.height = (10 + (data[i % data.length] / 255) * 130) + 'px'; }
+      else { for (let i = 0; i < bars.length; i++) bars[i].style.height = '8px'; }   // resting flat when nothing plays
       raf = requestAnimationFrame(draw);
     };
     draw(); return () => cancelAnimationFrame(raf);
@@ -213,9 +213,6 @@ function App() {
   const importSunoPlaylist = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Open a playlist, then right-click songs (or ⬇ import all) 🎀'); };
   const connect = () => { setEmbedded(true); setSunoStart('https://suno.com/me'); setTab('explore'); navSuno('https://suno.com/me'); flash('Log into Suno below — it\'s remembered after 🔑'); };
   const chromeLogin = async () => { setBusy(true); flash('Trying to import your Chrome login… 🔑'); try { const r = await api.chromeLogin(); flash(r.ok ? ('Imported ' + r.count + ' cookies — you should be logged in 💜') : r.message, !r.ok); if (r.ok) { setEmbedded(true); setTab('explore'); } } catch (e) { flash('Chrome import failed.', true); } finally { setBusy(false); } };
-  // Force the embedded Suno page to auto-scroll its (virtualized) library so EVERY
-  // song loads — the harvester only sees rows that are actually rendered.
-  const scanAll = () => { const w = webviewRef.current; if (w && w.send) { try { w.send('kw-deep-harvest'); flash('Scanning your whole library — sit tight 🔎'); } catch {} } };
   // Manual pick mode: click a song right in the Suno pane to add exactly that one.
   const togglePick = () => { const next = !picking; setPicking(next); const w = webviewRef.current; if (w && w.send) { try { w.send('kw-pick-mode', next); } catch {} } flash(next ? 'Pick mode on — click any song in the page to add it 🎯' : 'Pick mode off'); };
 
@@ -240,10 +237,6 @@ function App() {
         flash('Connected to Suno 🎀');
       } else if (e.channel === 'suno-reset') {
         setPageTracks([]);
-      } else if (e.channel === 'suno-scan') {
-        const st = (e.args[0] || {}).state;
-        if (st === 'start') flash('Loading your whole library… 🔎');
-        else if (st === 'done') flash('Library scan done — everything\'s in the list 💜');
       } else if (e.channel === 'suno-pick') {
         const t = e.args[0];
         if (t && t.id) { api.importTrack(t); flash('Added "' + String(t.title || 'song').slice(0, 28) + '" 💜'); }
@@ -352,7 +345,6 @@ function App() {
             <>
               <div className="side-head"><div className="side-title">To import <small>{pageView.length}</small></div>
                 <button className={'pill-btn' + (onlyPlayed ? ' hot' : '')} onClick={() => setOnlyPlayed((v) => !v)}>{onlyPlayed ? '▶ played' : 'all'}</button></div>
-              <button className="connect-btn" onClick={scanAll}>🔎 Find all my songs</button>
               {pageView.length > 0 && <button className="connect-btn" onClick={() => { pageView.forEach((t) => api.importTrack(t)); flash('Imported ' + pageView.length + ' song' + (pageView.length > 1 ? 's' : '') + ' 💜'); }}>＋ Import these {pageView.length}</button>}
               <div className="tracklist">
                 {pageView.length === 0 && <div className="empty-note">{onlyPlayed ? <>Play the songs you want on the right ▶<br/>Only ones you play show here (toggle “played” off to see all).</> : <>Browse Suno on the right 🌸<br/>New songs appear here — tap ＋ to import.</>}</div>}
@@ -360,7 +352,7 @@ function App() {
                   <div key={t.id + ':' + i} className="track" style={{ animationDelay: Math.min(i * 0.03, 0.4) + 's' }}>
                     {!played[t.id] && <span className="newdot" title="not played yet" />}
                     {t.cover ? <img className="thumb" src={t.cover} alt="" onError={(e) => { e.target.style.display = 'none'; }} /> : <div className="tnum">{GLYPHS[i % GLYPHS.length]}</div>}
-                    <div className="tmeta"><div className="tname">{t.title}</div><div className="tsrc">{played[t.id] ? '▶ played' : '💜 Suno'}</div></div>
+                    <div className="tmeta"><div className="tname">{t.title}</div><div className="tsrc">{played[t.id] ? '▶ played' : '🌹 Suno'}</div></div>
                     <button className="imp-btn" title="Import" onClick={() => { api.importTrack(t); flash('Imported "' + String(t.title).slice(0, 24) + '" 💜'); }}>＋</button>
                   </div>
                 ))}
@@ -393,7 +385,7 @@ function App() {
               {list.map((t, i) => (
                 <TrackRow key={t.id + ':' + i} track={t} index={i} active={t.id === curId} playing={playing}
                           onPlay={() => playFrom(list, i)} onMenu={openMenu(t)}
-                          selectable selected={selected.includes(t.id)} onToggle={() => toggleSel(t.id)} />
+                          selectable checked={selected.includes(t.id)} onToggle={() => toggleSel(t.id)} />
               ))}
             </div>
           )}

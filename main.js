@@ -336,25 +336,37 @@ async function chromeImport() {
     aesKey = await dpapiUnprotect(enc);
   } catch { return { ok: false, message: 'Could not read Chrome\'s encryption key.' }; }
 
-  const dbs = [
-    path.join(udir, 'Default', 'Network', 'Cookies'),
-    path.join(udir, 'Default', 'Cookies'),
-    path.join(udir, 'Profile 1', 'Network', 'Cookies'),
-  ].filter((p) => fs.existsSync(p));
-  if (!dbs.length) return { ok: false, message: 'Chrome cookie store not found.' };
+  // Enumerate EVERY Chrome profile (you may be signed into Suno under any of them),
+  // not just Default / Profile 1.
+  let profileNames = ['Default', 'Profile 1', 'Profile 2', 'Profile 3', 'Profile 4'];
+  try {
+    const extra = fs.readdirSync(udir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && /^(Default|Profile \d+)$/.test(d.name))
+      .map((d) => d.name);
+    profileNames = Array.from(new Set(profileNames.concat(extra)));
+  } catch {}
+  const dbs = [];
+  for (const name of profileNames) {
+    for (const sub of [['Network', 'Cookies'], ['Cookies']]) {
+      const p = path.join(udir, name, ...sub);
+      if (fs.existsSync(p) && !dbs.includes(p)) dbs.push(p);
+    }
+  }
+  if (!dbs.length) return { ok: false, message: 'No Chrome cookie store found on this PC.' };
 
   let SQL;
   try { SQL = await initSqlJs({ locateFile: (f) => path.join(path.dirname(require.resolve('sql.js')), f) }); }
   catch { return { ok: false, message: 'Could not start the cookie reader.' }; }
 
-  let count = 0, abe = 0;
+  let count = 0, abe = 0, sawRows = 0, openFail = 0;
   for (const dbPath of dbs) {
     let buf;
-    try { const tmp = path.join(os.tmpdir(), 'kw_ck_' + Date.now()); fs.copyFileSync(dbPath, tmp); buf = fs.readFileSync(tmp); fs.unlinkSync(tmp); } catch { continue; }
-    let db; try { db = new SQL.Database(buf); } catch { continue; }
-    let res; try { res = db.exec("SELECT host_key,name,encrypted_value,path,is_secure,expires_utc FROM cookies WHERE host_key LIKE '%suno%' OR host_key LIKE '%clerk%'"); } catch { db.close(); continue; }
+    try { const tmp = path.join(os.tmpdir(), 'kw_ck_' + Date.now() + '_' + Math.random().toString(36).slice(2)); fs.copyFileSync(dbPath, tmp); buf = fs.readFileSync(tmp); fs.unlinkSync(tmp); } catch { openFail++; continue; }
+    let db; try { db = new SQL.Database(buf); } catch { openFail++; continue; }
+    let res; try { res = db.exec("SELECT host_key,name,encrypted_value,path,is_secure,expires_utc FROM cookies WHERE host_key LIKE '%suno%' OR host_key LIKE '%clerk%'"); } catch { db.close(); openFail++; continue; }
     if (!res.length) { db.close(); continue; }
     const cols = res[0].columns, rows = res[0].values;
+    sawRows += rows.length;
     for (const row of rows) {
       const o = {}; cols.forEach((c, i) => (o[c] = row[i]));
       if (!o.encrypted_value) continue;
@@ -385,7 +397,9 @@ async function chromeImport() {
     db.close();
   }
   if (count === 0 && abe > 0) return { ok: false, message: 'Your Chrome version locks cookies (app-bound encryption) — they can\'t be imported. Please log in once manually; it\'s remembered after.' };
-  if (count === 0) return { ok: false, message: 'No Suno cookies found in Chrome — are you logged into Suno there?' };
+  if (count === 0 && sawRows > 0) return { ok: false, message: 'Found your Suno cookies but couldn\'t decrypt them — fully close Chrome and try again, or just log in here once (it\'s remembered).' };
+  if (count === 0 && openFail > 0 && sawRows === 0) return { ok: false, message: 'Couldn\'t read Chrome\'s cookies — close Chrome completely and try again, or log in here once.' };
+  if (count === 0) return { ok: false, message: 'No Suno cookies found in Chrome (checked ' + dbs.length + ' profile' + (dbs.length > 1 ? 's' : '') + '). Open suno.com in Chrome and sign in there, or just log in here once.' };
   return { ok: true, count };
 }
 

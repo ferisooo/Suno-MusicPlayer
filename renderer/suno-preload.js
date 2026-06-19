@@ -40,7 +40,6 @@ function looksLikeAvatar(img) {
   return /avatar|profile|pfp|user-?img/i.test(tag) || (w > 0 && w < 40);   // tiny / profile images aren't covers
 }
 
-let lastScanCount = 0;
 function scanDom() {
   try {
     const byId = new Map();
@@ -76,7 +75,6 @@ function scanDom() {
       audioUrl: 'https://cdn1.suno.ai/' + id + '.mp3',
       cover: v.cover, source: 'suno',
     }));
-    lastScanCount = out.length;
     send(out);
   } catch {}
 }
@@ -141,53 +139,6 @@ try {
     }
   }, true);
 } catch {}
-
-/* ---------- deep harvest: auto-scroll so the WHOLE (virtualized) library loads ----------
-   Suno's song lists are virtualized — only the rows on screen exist in the DOM, so a
-   plain scrape just catches the first screenful. We step a real scroll container to the
-   bottom until the song count stops growing, scanning as we go (and letting the page's
-   own feed requests fire, which the fetch/XHR hooks above harvest with richer metadata),
-   then return to the top. Runs automatically on the "my songs" page and on host request. */
-function findScrollers() {
-  const out = [];
-  const root = document.scrollingElement || document.documentElement;
-  if (root) out.push(root);
-  let scanned = 0;
-  for (const el of document.querySelectorAll('div, main, section, ul')) {
-    if (scanned++ > 4000) break;
-    if (el.scrollHeight > el.clientHeight + 240) {
-      const oy = getComputedStyle(el).overflowY;
-      if (oy === 'auto' || oy === 'scroll') out.push(el);
-    }
-  }
-  return out;
-}
-let harvesting = false;
-async function deepHarvest() {
-  if (harvesting) return; harvesting = true;
-  try { ipcRenderer.sendToHost('suno-scan', { state: 'start' }); } catch {}
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  try {
-    let last = -1, stable = 0;
-    for (let step = 0; step < 120 && stable < 4; step++) {
-      for (const el of findScrollers()) { try { el.scrollTop = el.scrollHeight; } catch {} }
-      try { window.scrollTo(0, document.body.scrollHeight); } catch {}
-      await sleep(650);
-      scanDom();
-      const count = lastScanCount;
-      if (count <= last) stable++; else { stable = 0; last = count; }
-    }
-    for (const el of findScrollers()) { try { el.scrollTop = 0; } catch {} }
-    try { window.scrollTo(0, 0); } catch {}
-    scanDom();
-  } catch {} finally {
-    harvesting = false;
-    try { ipcRenderer.sendToHost('suno-scan', { state: 'done' }); } catch {}
-  }
-}
-function isLibraryPage() { return /\/(me|create|library|songs|playlist)\b/.test(location.pathname); }
-// host "Find all my songs" button asks for a full scan
-try { ipcRenderer.on('kw-deep-harvest', () => deepHarvest()); } catch {}
 
 /* ---------- manual pick mode: click a song in the page to add exactly that one ----------
    Toggled from the host. While on, hovering highlights the song row under the cursor and
@@ -261,7 +212,6 @@ function checkUrl() {
     lastUrl = location.href;
     try { ipcRenderer.sendToHost('suno-reset'); } catch {}
     setTimeout(scanDom, 400); setTimeout(scanDom, 1200); setTimeout(scanDom, 2500);
-    if (isLibraryPage()) setTimeout(deepHarvest, 1600);
   }
 }
 try {
@@ -274,7 +224,6 @@ try {
 function start() {
   try { ipcRenderer.sendToHost('suno-ready'); } catch {}
   scanDom();
-  if (isLibraryPage()) setTimeout(deepHarvest, 1800);
   setInterval(scanDom, 1800);
   setInterval(checkUrl, 900);
   try { new MutationObserver(() => { clearTimeout(window.__kwScan); window.__kwScan = setTimeout(scanDom, 600); }).observe(document.documentElement, { childList: true, subtree: true }); } catch {}

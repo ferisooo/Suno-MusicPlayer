@@ -14,7 +14,7 @@
       const pcv = document.getElementById("bg-particles"), tcv = document.getElementById("cursor-trail");
       const pctx = pcv.getContext("2d"), tctx = tcv.getContext("2d");
       let raf;
-      const COLORS = ["#ff7ec2", "#ffe066", "#ff4fa3", "#caa7ff"];
+      const COLORS = ["#ff5d8f", "#ffce47", "#ff86b3", "#e6ad1f"];
       function size() {
         for (const c of [pcv, tcv]) {
           c.width = innerWidth;
@@ -64,7 +64,7 @@
           t.life *= 0.92;
           const rr = i / trail.length * 7 + 1;
           tctx.globalAlpha = t.life * 0.6;
-          tctx.fillStyle = i % 2 ? "#ffe066" : "#ff7ec2";
+          tctx.fillStyle = i % 2 ? "#ffce47" : "#ff5d8f";
           tctx.beginPath();
           tctx.arc(t.x, t.y, rr, 0, 7);
           tctx.fill();
@@ -104,7 +104,7 @@
       track.cover ? /* @__PURE__ */ React.createElement("img", { className: "thumb", src: track.cover, alt: "", onError: (e) => {
         e.target.style.display = "none";
       } }) : /* @__PURE__ */ React.createElement("div", { className: "tnum" }, active && playing ? /* @__PURE__ */ React.createElement("div", { className: "eqbars" }, /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null)) : GLYPHS[index % GLYPHS.length]),
-      /* @__PURE__ */ React.createElement("div", { className: "tmeta" }, /* @__PURE__ */ React.createElement("div", { className: "tname" }, track.title), /* @__PURE__ */ React.createElement("div", { className: "tsrc" }, "\u{1F49C} Suno")),
+      /* @__PURE__ */ React.createElement("div", { className: "tmeta" }, /* @__PURE__ */ React.createElement("div", { className: "tname" }, track.title), /* @__PURE__ */ React.createElement("div", { className: "tsrc" }, "\u{1F339} Suno")),
       active && playing && track.cover && /* @__PURE__ */ React.createElement("div", { className: "eqbars", style: { marginLeft: "auto" } }, /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null), /* @__PURE__ */ React.createElement("span", null))
     );
   }
@@ -211,9 +211,9 @@
         if (an && playing) {
           const data = new Uint8Array(an.frequencyBinCount);
           an.getByteFrequencyData(data);
-          for (let i = 0; i < bars.length; i++) bars[i].style.height = 6 + data[i % data.length] / 255 * 58 + "px";
+          for (let i = 0; i < bars.length; i++) bars[i].style.height = 10 + data[i % data.length] / 255 * 130 + "px";
         } else {
-          for (let i = 0; i < bars.length; i++) bars[i].style.height = 6 + (Math.sin(Date.now() / 380 + i) + 1) * 5 + "px";
+          for (let i = 0; i < bars.length; i++) bars[i].style.height = "8px";
         }
         raf = requestAnimationFrame(draw);
       };
@@ -400,16 +400,6 @@
         setBusy(false);
       }
     };
-    const scanAll = () => {
-      const w = webviewRef.current;
-      if (w && w.send) {
-        try {
-          w.send("kw-deep-harvest");
-          flash("Scanning your whole library \u2014 sit tight \u{1F50E}");
-        } catch {
-        }
-      }
-    };
     const togglePick = () => {
       const next = !picking;
       setPicking(next);
@@ -451,10 +441,6 @@
           flash("Connected to Suno \u{1F380}");
         } else if (e.channel === "suno-reset") {
           setPageTracks([]);
-        } else if (e.channel === "suno-scan") {
-          const st = (e.args[0] || {}).state;
-          if (st === "start") flash("Loading your whole library\u2026 \u{1F50E}");
-          else if (st === "done") flash("Library scan done \u2014 everything's in the list \u{1F49C}");
         } else if (e.channel === "suno-pick") {
           const t = e.args[0];
           if (t && t.id) {
@@ -582,12 +568,12 @@
     } }, "Make")), !curPl && /* @__PURE__ */ React.createElement("div", { className: "pl-grid" }, playlists.length === 0 && !creating && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, "No playlists yet \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "Make one, then right-click songs to add them."), playlists.map((p) => /* @__PURE__ */ React.createElement("div", { key: p.id, className: "pl-card", onClick: () => setSelPl(p.id) }, /* @__PURE__ */ React.createElement("div", { className: "pl-emoji" }, GLYPHS[p.name.length % GLYPHS.length]), /* @__PURE__ */ React.createElement("div", { className: "pl-name" }, p.name), /* @__PURE__ */ React.createElement("div", { className: "pl-count" }, p.trackIds.length, " songs"), /* @__PURE__ */ React.createElement("button", { className: "pl-del", title: "Delete", onClick: (e) => {
       e.stopPropagation();
       api.deletePlaylist(p.id);
-    } }, "\u2715"))))), tab === "explore" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "To import ", /* @__PURE__ */ React.createElement("small", null, pageView.length)), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (onlyPlayed ? " hot" : ""), onClick: () => setOnlyPlayed((v) => !v) }, onlyPlayed ? "\u25B6 played" : "all")), /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: scanAll }, "\u{1F50E} Find all my songs"), pageView.length > 0 && /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: () => {
+    } }, "\u2715"))))), tab === "explore" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "side-head" }, /* @__PURE__ */ React.createElement("div", { className: "side-title" }, "To import ", /* @__PURE__ */ React.createElement("small", null, pageView.length)), /* @__PURE__ */ React.createElement("button", { className: "pill-btn" + (onlyPlayed ? " hot" : ""), onClick: () => setOnlyPlayed((v) => !v) }, onlyPlayed ? "\u25B6 played" : "all")), pageView.length > 0 && /* @__PURE__ */ React.createElement("button", { className: "connect-btn", onClick: () => {
       pageView.forEach((t) => api.importTrack(t));
       flash("Imported " + pageView.length + " song" + (pageView.length > 1 ? "s" : "") + " \u{1F49C}");
     } }, "\uFF0B Import these ", pageView.length), /* @__PURE__ */ React.createElement("div", { className: "tracklist" }, pageView.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "empty-note" }, onlyPlayed ? /* @__PURE__ */ React.createElement(React.Fragment, null, "Play the songs you want on the right \u25B6", /* @__PURE__ */ React.createElement("br", null), "Only ones you play show here (toggle \u201Cplayed\u201D off to see all).") : /* @__PURE__ */ React.createElement(React.Fragment, null, "Browse Suno on the right \u{1F338}", /* @__PURE__ */ React.createElement("br", null), "New songs appear here \u2014 tap \uFF0B to import.")), pageView.map((t, i) => /* @__PURE__ */ React.createElement("div", { key: t.id + ":" + i, className: "track", style: { animationDelay: Math.min(i * 0.03, 0.4) + "s" } }, !played[t.id] && /* @__PURE__ */ React.createElement("span", { className: "newdot", title: "not played yet" }), t.cover ? /* @__PURE__ */ React.createElement("img", { className: "thumb", src: t.cover, alt: "", onError: (e) => {
       e.target.style.display = "none";
-    } }) : /* @__PURE__ */ React.createElement("div", { className: "tnum" }, GLYPHS[i % GLYPHS.length]), /* @__PURE__ */ React.createElement("div", { className: "tmeta" }, /* @__PURE__ */ React.createElement("div", { className: "tname" }, t.title), /* @__PURE__ */ React.createElement("div", { className: "tsrc" }, played[t.id] ? "\u25B6 played" : "\u{1F49C} Suno")), /* @__PURE__ */ React.createElement("button", { className: "imp-btn", title: "Import", onClick: () => {
+    } }) : /* @__PURE__ */ React.createElement("div", { className: "tnum" }, GLYPHS[i % GLYPHS.length]), /* @__PURE__ */ React.createElement("div", { className: "tmeta" }, /* @__PURE__ */ React.createElement("div", { className: "tname" }, t.title), /* @__PURE__ */ React.createElement("div", { className: "tsrc" }, played[t.id] ? "\u25B6 played" : "\u{1F339} Suno")), /* @__PURE__ */ React.createElement("button", { className: "imp-btn", title: "Import", onClick: () => {
       api.importTrack(t);
       flash('Imported "' + String(t.title).slice(0, 24) + '" \u{1F49C}');
     } }, "\uFF0B"))))), selectable && selected.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "selbar" }, /* @__PURE__ */ React.createElement("span", { className: "selcount" }, selected.length, " selected"), /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: downloadSel }, "\u2B07 Download"), /* @__PURE__ */ React.createElement("div", { className: "movewrap", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("button", { className: "sel-act", onClick: () => setPlMenuOpen((o) => !o) }, "\u{1F4C3} Move \u25BE"), plMenuOpen && /* @__PURE__ */ React.createElement("div", { className: "movemenu" }, playlists.length === 0 && /* @__PURE__ */ React.createElement("div", { className: "ctx-empty" }, "No playlists"), playlists.map((p) => /* @__PURE__ */ React.createElement("button", { key: p.id, className: "ctx-item", onClick: () => moveSel(p.id, p.name) }, GLYPHS[p.name.length % GLYPHS.length], " ", p.name)), /* @__PURE__ */ React.createElement("button", { className: "ctx-item", onClick: async () => {
@@ -604,7 +590,7 @@
         onPlay: () => playFrom(list, i),
         onMenu: openMenu(t),
         selectable: true,
-        selected: selected.includes(t.id),
+        checked: selected.includes(t.id),
         onToggle: () => toggleSel(t.id)
       }
     )))), /* @__PURE__ */ React.createElement("main", { className: "stage" }, /* @__PURE__ */ React.createElement("div", { className: "stage-inner" }, /* @__PURE__ */ React.createElement("div", { className: "now-view", style: { display: tab === "explore" ? "none" : "flex" } }, /* @__PURE__ */ React.createElement("section", { className: "now" }, /* @__PURE__ */ React.createElement("div", { className: "art-wrap" }, /* @__PURE__ */ React.createElement("div", { className: "art-ring" + (playing ? " live" : "") }), /* @__PURE__ */ React.createElement("div", { className: "art" }, current && current.cover ? /* @__PURE__ */ React.createElement("img", { src: current.cover, alt: "" }) : /* @__PURE__ */ React.createElement("div", { className: "art-glyph" }, current ? "\u{1F3B5}" : "\u{1F3A7}"))), /* @__PURE__ */ React.createElement("div", { className: "now-meta" }, /* @__PURE__ */ React.createElement("div", { className: "now-kicker" }, playing ? "Now Playing" : current ? "Paused" : "Ready"), /* @__PURE__ */ React.createElement("div", { className: "now-title glow" }, current ? current.title : "Pick a song to begin"), /* @__PURE__ */ React.createElement("div", { className: "now-sub" }, current ? "Suno AI track" : "Your kawaii music corner \u{1F380}"), /* @__PURE__ */ React.createElement("div", { className: "viz", ref: vizRef }, Array.from({ length: 28 }).map((_, i) => /* @__PURE__ */ React.createElement("span", { key: i }))))), lyricLines.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "lyrics", ref: lyricsRef }, lyricLines.map((l, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "lyric-line" }, l)))), embedded && /* @__PURE__ */ React.createElement("div", { className: "suno-embed", style: { display: tab === "explore" ? "flex" : "none" } }, /* @__PURE__ */ React.createElement("div", { className: "embed-nav" }, /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/explore") }, "\u{1F31F} Explore"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => navSuno("https://suno.com/me") }, "\u{1F511} My songs"), /* @__PURE__ */ React.createElement("button", { className: "pill-btn", onClick: () => {
