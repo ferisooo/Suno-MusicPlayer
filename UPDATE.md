@@ -2,6 +2,16 @@
 
 Newest first. Short notes only.
 
+## v1.2.6 — 2026-06-19
+- Fixed: **playlist / library songs weren't detected** — those rows aren't
+  `/song/` links (the title navigates via JS), so anchor-only scraping missed
+  them and only the playing song slipped through. Now the scraper also reads the
+  song id from **cover thumbnails** (their URL embeds the id) and **data-clip
+  attributes**, and pulls each title from its row. Avatars/profile pics are
+  skipped so they don't show up as phantom songs.
+- Fixed: songs whose name couldn't be read no longer collapse into a single
+  "Suno song" entry in the import list — placeholders are kept distinct.
+
 ## v1.2.5 — 2026-06-19
 - Changed: **the player bar now hides while you're in Explore**, so the embedded
   Suno page fills the whole stage and is much bigger to browse. It comes back the

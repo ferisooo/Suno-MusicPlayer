@@ -273,12 +273,15 @@ function App() {
   const repeatOn = repeat !== 'off';
   const curPl = playlists.find((p) => p.id === selPl);
 
-  // explore: hide already-imported, collapse same-title dupes, optionally played-only
+  // explore: hide already-imported, collapse same-title dupes, optionally played-only.
+  // Generic placeholder titles (a scrape that found the song but not its name) are
+  // NEVER collapsed/filtered by title — otherwise many distinct songs would merge into one.
+  const GENERIC_TITLE = new Set(['', 'suno song', 'untitled suno song']);
   const importedIds = new Set(tracks.map((t) => t.id));
   const importedTitles = new Set(tracks.map((t) => (t.title || '').toLowerCase()));
-  let pageView = pageTracks.filter((t) => !importedIds.has(t.id) && !importedTitles.has((t.title || '').toLowerCase()));
+  let pageView = pageTracks.filter((t) => { const k = (t.title || '').toLowerCase(); return !importedIds.has(t.id) && (GENERIC_TITLE.has(k) || !importedTitles.has(k)); });
   const seenTitle = new Set();
-  pageView = pageView.filter((t) => { const k = (t.title || '').toLowerCase(); if (seenTitle.has(k)) return false; seenTitle.add(k); return true; });
+  pageView = pageView.filter((t) => { const k = (t.title || '').toLowerCase(); if (GENERIC_TITLE.has(k)) return true; if (seenTitle.has(k)) return false; seenTitle.add(k); return true; });
   if (onlyPlayed) pageView = pageView.filter((t) => played[t.id]);
   const selectable = tab === 'library' || (tab === 'playlists' && curPl);
 

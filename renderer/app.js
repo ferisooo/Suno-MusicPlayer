@@ -504,12 +504,17 @@
     const pct = duration ? progress / duration * 100 : 0;
     const repeatOn = repeat !== "off";
     const curPl = playlists.find((p) => p.id === selPl);
+    const GENERIC_TITLE = /* @__PURE__ */ new Set(["", "suno song", "untitled suno song"]);
     const importedIds = new Set(tracks.map((t) => t.id));
     const importedTitles = new Set(tracks.map((t) => (t.title || "").toLowerCase()));
-    let pageView = pageTracks.filter((t) => !importedIds.has(t.id) && !importedTitles.has((t.title || "").toLowerCase()));
+    let pageView = pageTracks.filter((t) => {
+      const k = (t.title || "").toLowerCase();
+      return !importedIds.has(t.id) && (GENERIC_TITLE.has(k) || !importedTitles.has(k));
+    });
     const seenTitle = /* @__PURE__ */ new Set();
     pageView = pageView.filter((t) => {
       const k = (t.title || "").toLowerCase();
+      if (GENERIC_TITLE.has(k)) return true;
       if (seenTitle.has(k)) return false;
       seenTitle.add(k);
       return true;
