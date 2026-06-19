@@ -1,4 +1,13 @@
-node_modules/ 
-dist/ 
-out/ 
-build/ 
+node_modules/
+dist/
+out/
+build/
+
+# never commit personal audio dropped into the player's music folder
+music/*
+!music/README.txt
+
+# never commit secrets / saved config
+config.json
+*.local
+setup.zip

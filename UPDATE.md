@@ -2,6 +2,15 @@
 
 Newest first. Short notes only.
 
+## v1.3.1 — 2026-06-19
+- Fixed: **tab labels getting cut off** — with four tabs they now wrap to a tidy
+  2×2 grid so each has room (no clipping on the active tab).
+- Removed: **setup.zip** from the repo. Its features are already ported into the
+  Create tab, and the zip contained a hardcoded DeepSeek API key — **rotate that
+  key**, it's still recoverable from git history.
+- Added .gitignore rules so personal audio in `music/`, `config.json`, and any
+  `setup.zip` can't be committed by accident. (No imported music was ever tracked.)
+
 ## v1.3.0 — 2026-06-19
 - Added: **🎨 Create tab — "Suno Lyric Forge"** (ported from setup.zip). Describe a
   feeling and DeepSeek writes a Suno-ready **title + style tags + lyrics**: mood

@@ -354,12 +354,13 @@ body::after {
 @keyframes slidein { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
 
 /* ---------- tabs / explore / connect ---------- */
-.tabs { display: flex; gap: 6px; padding: 12px 14px 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px 4px; }
 .tab {
-  flex: 1; -webkit-app-region: no-drag; cursor: pointer;
+  flex: 1 1 calc(50% - 3px); min-width: 0; -webkit-app-region: no-drag; cursor: pointer;
   border: 1px solid var(--line); background: rgba(255,255,255,0.04);
   color: var(--muted); font-family: var(--display); font-weight: 600; font-size: 13px;
-  padding: 9px 0; border-radius: 12px; text-align: center;
+  padding: 9px 6px; border-radius: 12px; text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
   transition: transform .16s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
 }
 .tab:hover { color: var(--cloud); background: rgba(255,126,194,0.18); transform: translateY(-1px); }
