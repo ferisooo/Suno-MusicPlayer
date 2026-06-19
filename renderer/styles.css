@@ -235,6 +235,9 @@ body::after {
 .embed-hint { margin-left: auto; color: var(--muted); font-size: 12px; }
 .suno-webview { flex: 1; min-height: 0; width: 100%; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: #0c0a12; }
 
+/* Creation tab (Suno Lyric Forge) fills the stage like the embed does */
+.creation-pane { flex: 1; min-height: 0; }
+
 .now { display: flex; gap: 28px; align-items: center; min-height: 0; }
 .art-wrap { position: relative; flex: none; }
 .art {

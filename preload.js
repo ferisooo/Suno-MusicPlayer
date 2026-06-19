@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld('kawaii', {
   exportLibrary: () => ipcRenderer.invoke('config:export'),
   importLibrary: () => ipcRenderer.invoke('config:import'),
 
+  // deepseek (Creation tab)
+  deepseek: (payload) => ipcRenderer.invoke('deepseek:chat', payload),
+  getDsKey: () => ipcRenderer.invoke('deepseek:getKey'),
+  setDsKey: (key) => ipcRenderer.invoke('deepseek:setKey', key),
+
   // toasts pushed from main (e.g. after right-click import)
   onToast: (cb) => ipcRenderer.on('toast', (_e, p) => cb(p)),
 });

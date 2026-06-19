@@ -117,6 +117,51 @@ function fetchRaw(url, { binary = false, redirects = 5, auth = null } = {}) {
   });
 }
 
+// POST JSON helper (used by the DeepSeek proxy)
+function postJson(url, bodyObj, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const data = Buffer.from(JSON.stringify(bodyObj));
+    const lib = u.protocol === 'https:' ? https : http;
+    const req = lib.request({
+      method: 'POST', hostname: u.hostname, port: u.port || undefined, path: u.pathname + u.search,
+      headers: Object.assign({ 'Content-Type': 'application/json', 'Content-Length': data.length, 'User-Agent': USER_AGENT, 'Accept': 'application/json' }, headers),
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.setTimeout(90000, () => req.destroy(new Error('Request timed out')));
+    req.write(data); req.end();
+  });
+}
+
+/* ===================== DeepSeek (Creation tab) ===================== */
+ipcMain.handle('deepseek:getKey', () => { return readConfig().deepseekKey || ''; });
+ipcMain.handle('deepseek:setKey', (_e, key) => { const c = readConfig(); c.deepseekKey = String(key || '').trim(); writeConfig(c); return true; });
+ipcMain.handle('deepseek:chat', async (_e, payload) => {
+  const key = (readConfig().deepseekKey || '').trim();
+  if (!key) return { ok: false, error: 'No DeepSeek API key set — add it at the top of the Create tab.' };
+  const { messages, temperature, maxTokens } = payload || {};
+  if (!Array.isArray(messages)) return { ok: false, error: 'Bad request (no messages).' };
+  try {
+    const r = await postJson('https://api.deepseek.com/v1/chat/completions',
+      { model: 'deepseek-chat', messages, temperature, max_tokens: maxTokens },
+      { Authorization: 'Bearer ' + key });
+    if (r.status < 200 || r.status >= 300) {
+      let msg = 'HTTP ' + r.status;
+      if (r.status === 401) msg += ' — your DeepSeek API key looks wrong or expired.';
+      else { try { const e = JSON.parse(r.text); if (e.error && e.error.message) msg += ' — ' + e.error.message; } catch { msg += ' ' + r.text.slice(0, 160); } }
+      return { ok: false, error: msg };
+    }
+    const data = JSON.parse(r.text);
+    const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (content == null) return { ok: false, error: 'Empty response from DeepSeek.' };
+    return { ok: true, content };
+  } catch (e) { return { ok: false, error: e.message || 'DeepSeek request failed.' }; }
+});
+
 /* ===================== paste-a-link loader ===================== */
 function extractSunoId(input) {
   const s = String(input || '').replace(/[\u00a0\u200b\u200c\u200d\ufeff]/g, '').trim();

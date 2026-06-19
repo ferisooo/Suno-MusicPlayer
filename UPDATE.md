@@ -2,6 +2,18 @@
 
 Newest first. Short notes only.
 
+## v1.3.0 — 2026-06-19
+- Added: **🎨 Create tab — "Suno Lyric Forge"** (ported from setup.zip). Describe a
+  feeling and DeepSeek writes a Suno-ready **title + style tags + lyrics**: mood
+  idea bank, "enhance", language, style/lyric tag chips (click to pick · right-click
+  to pin/exclude), "suggest from mood", history, and copy buttons.
+- The DeepSeek call is **proxied through the main process** (no CORS), and the
+  **API key is entered in-app** (🔑 field at the top of the tab) and saved locally
+  in config — nothing hardcoded or committed. (The key shipped inside setup.zip is
+  public; rotate it.)
+- Re-themed the Forge to KawaiiSuno's black / gold / rose palette and made it fill
+  the Create tab (player bar hides there, like Explore).
+
 ## v1.2.9 — 2026-06-19
 - Removed: **auto song detection** in Explore (the "To import" list) and the
   **all / played** filter. Adding songs is now just **🎯 Pick songs** — click the

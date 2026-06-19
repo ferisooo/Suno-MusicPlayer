@@ -1,4 +1,5 @@
 /* app.jsx — Suno Kawaii Player UI (source). Compiled to app.js by build.js. */
+import { CreationTab } from './creation.jsx';
 const { useState, useEffect, useRef, useCallback } = React;
 const api = window.kawaii;
 
@@ -94,6 +95,7 @@ function App() {
   const [selected, setSelected] = useState([]);   // library: selected track ids
   const [plMenuOpen, setPlMenuOpen] = useState(false);
   const [picking, setPicking] = useState(false);   // explore: click-a-song-to-add mode
+  const [creationMounted, setCreationMounted] = useState(false);   // lazy-mount the Creation tab
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), lyricsRef = useRef(null);
@@ -262,6 +264,7 @@ function App() {
             <div className={'tab' + (tab === 'library' ? ' active' : '')} onClick={() => setTab('library')}>🎵 Library</div>
             <div className={'tab' + (tab === 'playlists' ? ' active' : '')} onClick={() => setTab('playlists')}>📃 Playlists</div>
             <div className={'tab' + (tab === 'explore' ? ' active' : '')} onClick={() => { setTab('explore'); setEmbedded(true); }}>🌟 Explore</div>
+            <div className={'tab' + (tab === 'creation' ? ' active' : '')} onClick={() => { setTab('creation'); setCreationMounted(true); }}>🎨 Create</div>
           </div>
 
           {tab === 'library' && (
@@ -301,6 +304,17 @@ function App() {
                   ))}
                 </div>
               )}
+            </>
+          )}
+
+          {tab === 'creation' && (
+            <>
+              <div className="side-head"><div className="side-title">Create</div></div>
+              <div className="empty-note">
+                ✨ <b>Suno Lyric Forge</b><br/><br/>
+                Describe a feeling and DeepSeek writes you a Suno-ready <b>title</b>, <b>style tags</b> and <b>lyrics</b> — copy each into Suno.<br/><br/>
+                Set your DeepSeek key (🔑) at the top of the panel first.
+              </div>
             </>
           )}
 
@@ -350,7 +364,7 @@ function App() {
         {/* ---------- stage ---------- */}
         <main className="stage">
           <div className="stage-inner">
-            <div className="now-view" style={{ display: tab === 'explore' ? 'none' : 'flex' }}>
+            <div className="now-view" style={{ display: (tab === 'explore' || tab === 'creation') ? 'none' : 'flex' }}>
               <section className="now">
                 <div className="art-wrap">
                   <div className={'art-ring' + (playing ? ' live' : '')} />
@@ -382,10 +396,16 @@ function App() {
                          preload={api.sunoPreloadPath} webpreferences="contextIsolation=no,sandbox=no,nodeIntegration=no"></webview>
               </div>
             )}
+
+            {creationMounted && (
+              <div className="creation-pane" style={{ display: tab === 'creation' ? 'flex' : 'none' }}>
+                <CreationTab />
+              </div>
+            )}
           </div>
 
-          {/* ---------- transport (hidden while exploring → Suno fills the space) ---------- */}
-          {tab !== 'explore' && (
+          {/* ---------- transport (hidden in Explore/Create so the pane fills the space) ---------- */}
+          {tab !== 'explore' && tab !== 'creation' && (
           <div className="transport">
             <div className="seek">
               <div className="time">{fmt(progress)}</div>
