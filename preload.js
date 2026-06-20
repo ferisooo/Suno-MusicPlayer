@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('kawaii', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   applyUpdate: () => ipcRenderer.invoke('update:apply'),
 
+  // OBS green-screen now-playing overlay
+  obsUpdate: (np) => ipcRenderer.invoke('obs:update', np),
+  obsPath: () => ipcRenderer.invoke('obs:path'),
+  obsOpen: () => ipcRenderer.invoke('obs:open'),
+
   // offline cache
   offlineGet: (id) => ipcRenderer.invoke('offline:get', id),
   offlineSave: (id, bytes) => ipcRenderer.invoke('offline:save', id, bytes),

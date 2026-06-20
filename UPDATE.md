@@ -2,6 +2,12 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.20
+- Added: **OBS stream overlay** (Settings → "OBS stream overlay"). The app writes a
+  green-screen `overlay.html` that shows only the current **song title** and
+  **"Suno AI track"**, updating live as songs change. Add it in OBS as a Browser
+  source (Local file), then Chroma-Key out the green. "Open folder" reveals the file.
+
 ## 2026-06-19 — v1.3.19
 - Reverted: the visualizer is back to its original behavior — the float/auto-gain
   rework was starving the high-frequency (right-hand) bars, so they barely moved.

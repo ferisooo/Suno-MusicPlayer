@@ -129,6 +129,7 @@ function App() {
   const [updateInfo, setUpdateInfo] = useState(null);                // {current, latest, url}
   const [updating, setUpdating] = useState(false);
   const [updErr, setUpdErr] = useState('');
+  const [obsFile, setObsFile] = useState('');
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -156,6 +157,12 @@ function App() {
   /* ---- offline cache ---- */
   const refreshOffline = async () => { try { const l = api.offlineList && await api.offlineList(); setOfflineCount(Array.isArray(l) ? l.length : 0); } catch {} };
   useEffect(() => { refreshOffline(); }, []);
+
+  /* ---- OBS overlay: push the now-playing song to the green-screen overlay file ---- */
+  useEffect(() => { api.obsPath && api.obsPath().then(setObsFile).catch(() => {}); }, []);
+  useEffect(() => {
+    try { api.obsUpdate && api.obsUpdate({ title: current ? current.title : '', sub: 'Suno AI track', playing: !!playing }); } catch {}
+  }, [current, playing]);
 
   /* ---- update check (once, a couple seconds after launch) ---- */
   useEffect(() => {
@@ -650,6 +657,16 @@ function App() {
               <button className="set-btn" title="Save all your songs + playlists to a .json file you pick" onClick={async () => { const ok = await api.exportLibrary(); if (ok) flash('Library backed up 💾'); }}>💾 Backup</button>
               <button className="set-btn" title="Load songs + playlists from a backup .json (merges — no duplicates)" onClick={async () => { const ok = await api.importLibrary(); flash(ok ? 'Library restored 💜' : 'Nothing restored.', !ok); }}>📂 Restore</button>
             </div>
+            <div className="set-row">
+              <div className="set-label"><div className="set-title">OBS stream overlay</div><div className="set-sub">green-screen "now playing" (song title + Suno AI track) for OBS</div></div>
+              <button className="set-btn" title="Open the folder holding overlay.html" onClick={() => api.obsOpen()}>Open folder</button>
+            </div>
+            {obsFile && (
+              <div className="obs-help">
+                In OBS: <b>＋ Sources → Browser → Local file</b> → pick <code>overlay.html</code> from the folder above, set the size (e.g. 1920×1080), then add a <b>Chroma Key</b> filter and remove the green. It updates live as songs change.
+                <div className="obs-path">{obsFile}</div>
+              </div>
+            )}
             <div className="set-eq">
               <div className="set-label"><div className="set-title">Equalizer</div><div className="set-sub">shapes the sound (and the visualizer follows it)</div></div>
               <div className="eq-presets">

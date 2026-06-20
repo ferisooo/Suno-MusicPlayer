@@ -733,3 +733,9 @@ body::after {
 .upd-btn.ghost:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,0.12); transform: translateY(-2px); }
 .upd-foot { font-size: 12px; color: var(--muted); }
 .upd-foot.err { color: #ff8a9c; }
+
+/* OBS overlay help block in Settings */
+.obs-help { font-size: 12px; color: var(--muted); line-height: 1.55; padding: 2px 2px 8px; }
+.obs-help b { color: var(--cloud); }
+.obs-help code { background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; color: var(--lemon); font-size: 11.5px; }
+.obs-path { margin-top: 8px; padding: 8px 10px; border-radius: 9px; background: rgba(12,10,18,0.6); border: 1px solid var(--line); color: var(--cloud); font-size: 11.5px; word-break: break-all; user-select: text; font-family: monospace; }
