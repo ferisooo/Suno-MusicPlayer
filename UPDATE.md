@@ -2,6 +2,11 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.19
+- Reverted: the visualizer is back to its original behavior — the float/auto-gain
+  rework was starving the high-frequency (right-hand) bars, so they barely moved.
+  Back to the lively full-spectrum bars.
+
 ## 2026-06-19 — v1.3.18
 - Changed: **"Update now" downloads the update itself over HTTPS** (no git, no
   browser) — it fetches the changed files straight from the repo and restarts.

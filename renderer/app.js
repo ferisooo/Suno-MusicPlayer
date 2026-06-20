@@ -1294,8 +1294,6 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
         const an = ctx2.createAnalyser();
         an.fftSize = 1024;
         an.smoothingTimeConstant = 0.82;
-        an.minDecibels = -85;
-        an.maxDecibels = -12;
         const eq = settingsRef.current.eq || { low: 0, mid: 0, high: 0 };
         const low = ctx2.createBiquadFilter();
         low.type = "lowshelf";
@@ -1340,46 +1338,35 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
         root.style.setProperty("--beat", "0");
         return;
       }
-      let raf, fdata = null, agcTop = -35;
+      let raf, data = null;
       const FRAME = 1e3 / 60;
       let last = 0;
-      const peaks = [];
       const draw = (now) => {
         raf = requestAnimationFrame(draw);
         if (document.hidden || now - last < FRAME - 1) return;
         last = now;
         const an = analyserRef.current;
         if (!an) return;
-        if (!fdata || fdata.length !== an.frequencyBinCount) fdata = new Float32Array(an.frequencyBinCount);
-        an.getFloatFrequencyData(fdata);
+        if (!data || data.length !== an.frequencyBinCount) data = new Uint8Array(an.frequencyBinCount);
+        an.getByteFrequencyData(data);
         const span = bigViz ? 260 : 130;
-        const n = bars.length, bins = fdata.length;
+        const n = bars.length, bins = data.length;
         const minB = 2, maxB = Math.max(minB + 1, Math.floor(bins * 0.66));
         const ratio = maxB / minB;
-        let frameMax = -160;
         for (let i = 0; i < n; i++) {
           const lo = Math.floor(minB * Math.pow(ratio, i / n));
           let hi = Math.floor(minB * Math.pow(ratio, (i + 1) / n));
           if (hi <= lo) hi = lo + 1;
-          let peak = -160;
-          for (let j = lo; j < hi && j < bins; j++) {
-            const d = fdata[j];
-            if (d > peak) peak = d;
-          }
-          peaks[i] = peak;
-          if (peak > frameMax) frameMax = peak;
+          let peak = 0;
+          for (let j = lo; j < hi && j < bins; j++) if (data[j] > peak) peak = data[j];
+          const v = Math.min(1, peak / 255 * (1 + i / n * 0.65));
+          bars[i].style.height = 10 + v * span + "px";
         }
-        agcTop = frameMax > agcTop ? frameMax : agcTop - 0.25;
-        const top = agcTop + 7, floor = top - 48, range = top - floor;
-        let beatSum = 0;
-        const beatBars = Math.max(1, Math.floor(n * 0.35));
-        for (let i = 0; i < n; i++) {
-          let v = (peaks[i] - floor) / range;
-          v = Math.min(1, Math.max(0, v) * (1 + i / n * 0.4));
-          bars[i].style.height = 8 + v * span + "px";
-          if (i < beatBars) beatSum += v;
-        }
-        root.style.setProperty("--beat", Math.min(1, beatSum / beatBars * 1.15).toFixed(3));
+        const beatLim = Math.floor(bins * 0.32);
+        let sum = 0;
+        for (let j = 2; j < beatLim; j++) sum += data[j];
+        const beat = Math.min(1, sum / Math.max(1, beatLim - 2) / 165);
+        root.style.setProperty("--beat", beat.toFixed(3));
       };
       raf = requestAnimationFrame(draw);
       return () => {
