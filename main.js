@@ -64,6 +64,18 @@ function createWindow() {
     },
   });
   mainWindow.loadFile('index.html');
+
+  // Hardening: the app shell is local. Don't let it be navigated away from
+  // index.html, and route any window.open to the system browser (http/https
+  // only) instead of spawning an uncontrolled BrowserWindow.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (!url.startsWith('file://')) e.preventDefault();
+  });
+
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('maximize', () => mainWindow.webContents.send('window:state', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:state', false));
@@ -162,7 +174,8 @@ ipcMain.on('open:external', (_e, url) => { if (/^https?:\/\//i.test(url)) shell.
 
 /* ===================== update check (compares running version to UPDATE.md) ===================== */
 function cmpVer(a, b) {
-  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  const num = (v) => String(v).split('.').map((n) => { const x = parseInt(n, 10); return Number.isFinite(x) ? x : 0; });
+  const pa = num(a), pb = num(b);
   for (let i = 0; i < 3; i++) { if ((pa[i] || 0) > (pb[i] || 0)) return 1; if ((pa[i] || 0) < (pb[i] || 0)) return -1; }
   return 0;
 }
@@ -192,7 +205,8 @@ ipcMain.handle('update:apply', async () => {
     for (const p of files) {
       const buf = await fetchRaw('https://raw.githubusercontent.com/' + UPDATE_REPO + '/main/' + p, { binary: true });
       const dest = path.join(dir, p);
-      if (!dest.startsWith(dir)) continue;                          // guard against path escapes
+      const rel = path.relative(dir, dest);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) continue;   // guard against path escapes
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       const old = fs.existsSync(dest) ? fs.readFileSync(dest) : null;
       if (!old || !old.equals(buf)) { fs.writeFileSync(dest, buf); count++; }   // only rewrite what changed
@@ -324,13 +338,24 @@ ipcMain.handle('suno:load', async (_e, input) => {
 function sunoSession() { return session.fromPartition('persist:suno'); }
 let sunoAuth = null;
 
+// Only suno.com / suno.ai (and their subdomains, e.g. cdn1.suno.ai) are trusted.
+// Used to gate where we'll fetch audio and — critically — where the captured Suno
+// bearer token may be sent, so a tampered backup can't exfiltrate it to a 3rd party.
+function isSunoHost(u) {
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return h === 'suno.com' || h === 'suno.ai' || h.endsWith('.suno.com') || h.endsWith('.suno.ai');
+  } catch { return false; }
+}
+
 function sunoFetchOnce(url, { auth, referer }) {
   return new Promise((resolve, reject) => {
     const request = net.request({ url, session: sunoSession(), useSessionCookies: true });
     request.setHeader('User-Agent', USER_AGENT);
     request.setHeader('Accept', '*/*');
     if (referer) { request.setHeader('Referer', 'https://suno.com/'); request.setHeader('Origin', 'https://suno.com'); }
-    if (auth && sunoAuth) request.setHeader('Authorization', sunoAuth);
+    // never attach the user's Suno auth token to a non-Suno host
+    if (auth && sunoAuth && isSunoHost(url)) request.setHeader('Authorization', sunoAuth);
     request.on('response', (r) => {
       const c = [];
       r.on('data', (d) => c.push(d));
@@ -342,10 +367,14 @@ function sunoFetchOnce(url, { auth, referer }) {
 }
 
 async function sunoFetchBuffer(url) {
-  // build candidate urls: the captured one + plain public CDN forms by id
+  // build candidate urls: the captured one (only if it's a Suno host) + plain
+  // public CDN forms by id. A non-Suno url is dropped so we never reach out to,
+  // or send credentials to, an arbitrary host smuggled in via an imported backup.
   const id = extractSunoId(url);
-  const candidates = [url];
+  const candidates = [];
+  if (isSunoHost(url)) candidates.push(url);
   if (id) { candidates.push('https://cdn1.suno.ai/' + id + '.mp3', 'https://cdn2.suno.ai/' + id + '.mp3'); }
+  if (!candidates.length) throw new Error('Not a Suno audio URL.');
   // header variants — some CDNs 403 with an Authorization header, some need Referer
   const variants = [{ auth: false, referer: true }, { auth: true, referer: true }, { auth: false, referer: false }];
   let lastErr;
@@ -359,7 +388,8 @@ async function sunoFetchBuffer(url) {
 }
 
 ipcMain.handle('suno:fetchUrl', async (_e, url) => {
-  if (!/suno\.(ai|com)/i.test(url) && !/cdn[0-9]*\.suno/i.test(url)) throw new Error('That URL is not a Suno address.');
+  // host-based check (not a substring match, which https://evil.com/suno.com would pass)
+  if (!isSunoHost(url) && !extractSunoId(url)) throw new Error('That URL is not a Suno address.');
   try {
     const buf = await sunoFetchBuffer(url);
     return { bytes: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
@@ -416,6 +446,15 @@ function attachHarvest(wc) {
 
   try { wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch {}
 
+  // Suno links that try to open a new tab/window get sent to the system browser
+  // (http/https only) rather than silently swallowed or opened inside the app.
+  try {
+    wc.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+      return { action: 'deny' };
+    });
+  } catch {}
+
   // capture the bearer token Suno's page sends, so we can fetch private audio
   // for the songs you Pick.
   try {
@@ -441,8 +480,15 @@ ipcMain.handle('config:import', async () => {
   if (res.canceled || !res.filePaths.length) return false;
   try {
     const d = JSON.parse(fs.readFileSync(res.filePaths[0], 'utf8'));
-    if (Array.isArray(d.importedTracks)) { const have = new Set(state.tracks.map((t) => t.id)); for (const t of d.importedTracks) if (!have.has(t.id)) state.tracks.push(t); }
-    if (Array.isArray(d.playlists)) { const have = new Set(state.playlists.map((p) => p.id)); for (const p of d.playlists) if (!have.has(p.id)) state.playlists.push(p); }
+    if (Array.isArray(d.importedTracks)) { const have = new Set(state.tracks.map((t) => t.id)); for (const t of d.importedTracks) if (t && t.id && !have.has(t.id)) state.tracks.push(t); }
+    if (Array.isArray(d.playlists)) {
+      const have = new Set(state.playlists.map((p) => p.id));
+      for (const p of d.playlists) {
+        if (!p || !p.id || have.has(p.id)) continue;
+        // normalize so a hand-edited backup can't break later playlist ops
+        state.playlists.push({ id: p.id, name: String(p.name || 'Playlist').slice(0, 40), trackIds: Array.isArray(p.trackIds) ? p.trackIds : [] });
+      }
+    }
     saveState(); return true;
   } catch { return false; }
 });
