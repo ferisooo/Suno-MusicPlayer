@@ -255,45 +255,44 @@ function App() {
     const root = document.documentElement;
     const bars = vizRef.current ? vizRef.current.children : [];
     if (!playing) { for (let i = 0; i < bars.length; i++) bars[i].style.height = '8px'; root.style.setProperty('--beat', '0'); return; }
-    let raf, data = null, agc = 160; const FRAME = 1000 / 60; let last = 0; const peaks = [];
+    let raf, fdata = null, agcTop = -35; const FRAME = 1000 / 60; let last = 0; const peaks = [];
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
       if (document.hidden || now - last < FRAME - 1) return;
       last = now;
       const an = analyserRef.current; if (!an) return;
-      if (!data || data.length !== an.frequencyBinCount) data = new Uint8Array(an.frequencyBinCount);
-      an.getByteFrequencyData(data);
+      if (!fdata || fdata.length !== an.frequencyBinCount) fdata = new Float32Array(an.frequencyBinCount);
+      an.getFloatFrequencyData(fdata);   // raw dB magnitudes — NOT clamped to 0..255, so loud bands don't saturate/stick
       const span = bigViz ? 260 : 130;   // taller bars when the visualizer is enlarged
       // Map bars across the spectrum on a LOG scale (how we hear pitch) so every bar
       // covers a real frequency band — otherwise all the energy piles into the low
-      // bins and the right-hand bars never move. Take each band's peak, lift the
-      // quieter highs a touch so they stay lively.
-      const n = bars.length, bins = data.length;
+      // bins and the right-hand bars never move. Take each band's peak (in dB).
+      const n = bars.length, bins = fdata.length;
       const minB = 2, maxB = Math.max(minB + 1, Math.floor(bins * 0.66));   // skip DC + near-silent top
       const ratio = maxB / minB;
-      let frameMax = 0;
+      let frameMax = -160;
       for (let i = 0; i < n; i++) {
         const lo = Math.floor(minB * Math.pow(ratio, i / n));
         let hi = Math.floor(minB * Math.pow(ratio, (i + 1) / n));
         if (hi <= lo) hi = lo + 1;
-        let peak = 0;
-        for (let j = lo; j < hi && j < bins; j++) if (data[j] > peak) peak = data[j];
+        let peak = -160;
+        for (let j = lo; j < hi && j < bins; j++) { const d = fdata[j]; if (d > peak) peak = d; }
         peaks[i] = peak; if (peak > frameMax) frameMax = peak;
       }
-      // auto-gain: track the recent loudest band (jumps up instantly, decays slowly)
-      // and scale bars to it — so a loud passage doesn't peg every bar at full; the
-      // bands keep their relative shape instead of flat-lining at the top.
-      agc = Math.max(frameMax, agc * 0.992);
-      const denom = Math.max(95, agc);
+      // auto-gain in dB: track the recent loudest band (jumps up instantly, decays
+      // slowly), keep ~7 dB headroom above it so the tallest bar never pegs the
+      // ceiling, and map a fixed dynamic window below it onto 0..1.
+      agcTop = frameMax > agcTop ? frameMax : agcTop - 0.25;
+      const top = agcTop + 7, floor = top - 48, range = top - floor;
+      let beatSum = 0; const beatBars = Math.max(1, Math.floor(n * 0.35));
       for (let i = 0; i < n; i++) {
-        const v = Math.min(1, (peaks[i] / denom) * (1 + (i / n) * 0.55));
-        bars[i].style.height = (10 + v * span) + 'px';
+        let v = (peaks[i] - floor) / range;
+        v = Math.min(1, Math.max(0, v) * (1 + (i / n) * 0.4));
+        bars[i].style.height = (8 + v * span) + 'px';
+        if (i < beatBars) beatSum += v;
       }
-      // overall beat energy (bass/low-mids carry the pulse) → drives button brightness
-      const beatLim = Math.floor(bins * 0.32); let sum = 0;
-      for (let j = 2; j < beatLim; j++) sum += data[j];
-      const beat = Math.min(1, (sum / Math.max(1, beatLim - 2)) / 165);
-      root.style.setProperty('--beat', beat.toFixed(3));
+      // overall beat energy (low/low-mid bars carry the pulse) → drives button brightness
+      root.style.setProperty('--beat', Math.min(1, (beatSum / beatBars) * 1.15).toFixed(3));
     };
     raf = requestAnimationFrame(draw);
     return () => { cancelAnimationFrame(raf); root.style.setProperty('--beat', '0'); };

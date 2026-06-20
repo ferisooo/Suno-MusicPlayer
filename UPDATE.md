@@ -2,6 +2,13 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.17
+- Fixed (for real this time): **visualizer bars maxing out on loud songs.** The
+  byte spectrum data is hard-clamped to 0..255, so loud bands saturated and stuck
+  at the top no matter what. Switched to the analyser's raw float (dB) data, which
+  has no such ceiling, and map a dynamic window with headroom so the loudest bar
+  sits around ~85%% and the bars keep moving through loud sections.
+
 ## 2026-06-19 — v1.3.16
 - Changed: the **update prompt is now a centered pop-up** (bigger, modal-style)
   instead of a small top banner.
