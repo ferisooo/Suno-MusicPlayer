@@ -127,6 +127,7 @@ function App() {
   const [offlineCount, setOfflineCount] = useState(0);
   const [caching, setCaching] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);                // {current, latest, url}
+  const [updating, setUpdating] = useState(false);
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -162,7 +163,17 @@ function App() {
     }, 2500);
     return () => clearTimeout(t);
   }, []);
-  const dismissUpdate = () => { if (updateInfo) updateSettings({ dismissedVersion: updateInfo.latest }); setUpdateInfo(null); };
+  const dismissUpdate = () => { if (updating) return; if (updateInfo) updateSettings({ dismissedVersion: updateInfo.latest }); setUpdateInfo(null); };
+  const applyUpdate = async () => {
+    if (updating) return; setUpdating(true);
+    try {
+      const r = api.applyUpdate && await api.applyUpdate();
+      if (r && r.ok) return;   // app will pull + relaunch into the new version; keep showing "Updating…"
+      setUpdating(false);
+      flash((r && r.error ? 'Live update unavailable (' + r.error + '). ' : '') + 'Opening the download page…', true);
+      api.openExternal(updateInfo.url);
+    } catch (e) { setUpdating(false); flash('Update failed — opening the download page…', true); api.openExternal(updateInfo.url); }
+  };
   const cacheAll = async () => {
     if (caching) return; setCaching(true);
     const items = tracks.filter((t) => t.audioUrl); let ok = 0, fail = 0;
@@ -672,11 +683,17 @@ function App() {
         </div>
       )}
       {updateInfo && (
-        <div className="update-banner">
-          <span className="upd-spark">✨</span>
-          <span className="upd-msg">Update available — <b>v{updateInfo.latest}</b> <small>(you have v{updateInfo.current})</small></span>
-          <button className="upd-btn" onClick={() => api.openExternal(updateInfo.url)}>View</button>
-          <button className="upd-btn ghost" onClick={dismissUpdate}>Dismiss</button>
+        <div className="update-overlay" onClick={dismissUpdate}>
+          <div className="update-card" onClick={(e) => e.stopPropagation()}>
+            <div className="upd-spark">✨</div>
+            <div className="upd-title">Update available</div>
+            <div className="upd-ver"><b>v{updateInfo.latest}</b> <small>· you have v{updateInfo.current}</small></div>
+            <div className="upd-actions">
+              <button className="upd-btn" disabled={updating} onClick={applyUpdate}>{updating ? 'Updating…' : '⬇ Update now'}</button>
+              <button className="upd-btn ghost" disabled={updating} onClick={dismissUpdate}>Later</button>
+            </div>
+            <div className="upd-foot">{updating ? 'pulling changes & restarting…' : 'updates in place & restarts — only the changes download'}</div>
+          </div>
         </div>
       )}
       {toast && <div className={'toast' + (toast.err ? ' err' : '')}>{busy && <div className="spinner" />}<span>{toast.msg}</span></div>}

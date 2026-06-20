@@ -2,6 +2,13 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.16
+- Changed: the **update prompt is now a centered pop-up** (bigger, modal-style)
+  instead of a small top banner.
+- Added: **one-click live update** — "Update now" pulls just the changed files
+  from the repo (no full re-download) and restarts the app into the new version.
+  Falls back to the download page if not running from a git checkout.
+
 ## 2026-06-19 — v1.3.15
 - Fixed: **visualizer no longer freezes at full height during loud passages.** The
   analyser was clamping every frequency bin to its max (255) when the music got

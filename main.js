@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
+const { execFile } = require('child_process');
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -97,6 +98,24 @@ ipcMain.handle('update:check', async () => {
     const latest = m ? m[1] : null;
     return { ok: true, current, latest, newer: latest ? cmpVer(latest, current) > 0 : false, url: 'https://github.com/ferisooo/KawaiiSuno' };
   } catch (e) { return { ok: false, current, error: e.message }; }
+});
+// Live in-place update: pull just the changed files from the repo (git delta — no
+// full re-download), then relaunch so the new main + renderer load. Only works when
+// running from a git checkout; the renderer falls back to the download page otherwise.
+function git(args, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile('git', args, { cwd, windowsHide: true, timeout: 60000 }, (err, stdout, stderr) => err ? reject(new Error((stderr || err.message || '').trim())) : resolve(String(stdout).trim()));
+  });
+}
+ipcMain.handle('update:apply', async () => {
+  const dir = app.getAppPath();
+  if (!fs.existsSync(path.join(dir, '.git'))) return { ok: false, error: 'not a git checkout' };
+  try {
+    await git(['fetch', '--depth', '1', 'origin', 'main'], dir);
+    await git(['reset', '--hard', 'origin/main'], dir);            // user data lives in userData/, not the repo — safe
+    setTimeout(() => { app.relaunch(); app.exit(0); }, 500);        // restart into the new version
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
 });
 
 /* ===================== settings (prefs / sort / favorites) ===================== */
