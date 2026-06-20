@@ -2,6 +2,13 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.18
+- Changed: **"Update now" downloads the update itself over HTTPS** (no git, no
+  browser) — it fetches the changed files straight from the repo and restarts.
+  Previously it needed git installed and opened the download page in a browser if
+  that was missing. On failure it now shows the reason in the pop-up with an
+  optional "Open page" button instead of auto-launching the browser.
+
 ## 2026-06-19 — v1.3.17
 - Fixed (for real this time): **visualizer bars maxing out on loud songs.** The
   byte spectrum data is hard-clamped to 0..255, so loud bands saturated and stuck

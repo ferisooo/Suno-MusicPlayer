@@ -732,3 +732,4 @@ body::after {
 .upd-btn.ghost { color: var(--muted); background: rgba(255,255,255,0.06); box-shadow: none; }
 .upd-btn.ghost:hover:not(:disabled) { color: #fff; background: rgba(255,255,255,0.12); transform: translateY(-2px); }
 .upd-foot { font-size: 12px; color: var(--muted); }
+.upd-foot.err { color: #ff8a9c; }

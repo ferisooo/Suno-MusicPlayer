@@ -128,6 +128,7 @@ function App() {
   const [caching, setCaching] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);                // {current, latest, url}
   const [updating, setUpdating] = useState(false);
+  const [updErr, setUpdErr] = useState('');
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -165,14 +166,13 @@ function App() {
   }, []);
   const dismissUpdate = () => { if (updating) return; if (updateInfo) updateSettings({ dismissedVersion: updateInfo.latest }); setUpdateInfo(null); };
   const applyUpdate = async () => {
-    if (updating) return; setUpdating(true);
+    if (updating) return; setUpdErr(''); setUpdating(true);
     try {
       const r = api.applyUpdate && await api.applyUpdate();
-      if (r && r.ok) return;   // app will pull + relaunch into the new version; keep showing "Updating…"
+      if (r && r.ok) return;   // files downloaded; app relaunches into the new version — keep showing "Updating…"
       setUpdating(false);
-      flash((r && r.error ? 'Live update unavailable (' + r.error + '). ' : '') + 'Opening the download page…', true);
-      api.openExternal(updateInfo.url);
-    } catch (e) { setUpdating(false); flash('Update failed — opening the download page…', true); api.openExternal(updateInfo.url); }
+      setUpdErr((r && r.error ? r.error : 'download failed') + ' — use “Open page” to grab it manually.');
+    } catch (e) { setUpdating(false); setUpdErr('Update failed — use “Open page” to grab it manually.'); }
   };
   const cacheAll = async () => {
     if (caching) return; setCaching(true);
@@ -689,9 +689,11 @@ function App() {
             <div className="upd-ver"><b>v{updateInfo.latest}</b> <small>· you have v{updateInfo.current}</small></div>
             <div className="upd-actions">
               <button className="upd-btn" disabled={updating} onClick={applyUpdate}>{updating ? 'Updating…' : '⬇ Update now'}</button>
-              <button className="upd-btn ghost" disabled={updating} onClick={dismissUpdate}>Later</button>
+              {updErr
+                ? <button className="upd-btn ghost" onClick={() => api.openExternal(updateInfo.url)}>Open page</button>
+                : <button className="upd-btn ghost" disabled={updating} onClick={dismissUpdate}>Later</button>}
             </div>
-            <div className="upd-foot">{updating ? 'pulling changes & restarting…' : 'updates in place & restarts — only the changes download'}</div>
+            <div className={'upd-foot' + (updErr ? ' err' : '')}>{updErr || (updating ? 'downloading update & restarting…' : 'downloads in place & restarts — no browser needed')}</div>
           </div>
         </div>
       )}

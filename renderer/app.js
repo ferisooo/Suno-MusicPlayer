@@ -1126,6 +1126,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const [caching, setCaching] = useState2(false);
     const [updateInfo, setUpdateInfo] = useState2(null);
     const [updating, setUpdating] = useState2(false);
+    const [updErr, setUpdErr] = useState2("");
     const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
     const urlCache = useRef(/* @__PURE__ */ new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
     const audioCtxRef = useRef(null), analyserRef = useRef(null), eqRef = useRef(null);
@@ -1189,17 +1190,16 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     };
     const applyUpdate = async () => {
       if (updating) return;
+      setUpdErr("");
       setUpdating(true);
       try {
         const r = api2.applyUpdate && await api2.applyUpdate();
         if (r && r.ok) return;
         setUpdating(false);
-        flash((r && r.error ? "Live update unavailable (" + r.error + "). " : "") + "Opening the download page\u2026", true);
-        api2.openExternal(updateInfo.url);
+        setUpdErr((r && r.error ? r.error : "download failed") + " \u2014 use \u201COpen page\u201D to grab it manually.");
       } catch (e) {
         setUpdating(false);
-        flash("Update failed \u2014 opening the download page\u2026", true);
-        api2.openExternal(updateInfo.url);
+        setUpdErr("Update failed \u2014 use \u201COpen page\u201D to grab it manually.");
       }
     };
     const cacheAll = async () => {
@@ -1783,7 +1783,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
           onChange: (e) => updateSettings({ eq: { ...settingsRef.current.eq || { low: 0, mid: 0, high: 0 }, [k]: parseInt(e.target.value, 10) } })
         }
       ), /* @__PURE__ */ React.createElement("span", { className: "eq-band-val" }, val > 0 ? "+" : "", val, " dB"));
-    }))))), updateInfo && /* @__PURE__ */ React.createElement("div", { className: "update-overlay", onClick: dismissUpdate }, /* @__PURE__ */ React.createElement("div", { className: "update-card", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "upd-spark" }, "\u2728"), /* @__PURE__ */ React.createElement("div", { className: "upd-title" }, "Update available"), /* @__PURE__ */ React.createElement("div", { className: "upd-ver" }, /* @__PURE__ */ React.createElement("b", null, "v", updateInfo.latest), " ", /* @__PURE__ */ React.createElement("small", null, "\xB7 you have v", updateInfo.current)), /* @__PURE__ */ React.createElement("div", { className: "upd-actions" }, /* @__PURE__ */ React.createElement("button", { className: "upd-btn", disabled: updating, onClick: applyUpdate }, updating ? "Updating\u2026" : "\u2B07 Update now"), /* @__PURE__ */ React.createElement("button", { className: "upd-btn ghost", disabled: updating, onClick: dismissUpdate }, "Later")), /* @__PURE__ */ React.createElement("div", { className: "upd-foot" }, updating ? "pulling changes & restarting\u2026" : "updates in place & restarts \u2014 only the changes download"))), toast && /* @__PURE__ */ React.createElement("div", { className: "toast" + (toast.err ? " err" : "") }, busy && /* @__PURE__ */ React.createElement("div", { className: "spinner" }), /* @__PURE__ */ React.createElement("span", null, toast.msg)));
+    }))))), updateInfo && /* @__PURE__ */ React.createElement("div", { className: "update-overlay", onClick: dismissUpdate }, /* @__PURE__ */ React.createElement("div", { className: "update-card", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "upd-spark" }, "\u2728"), /* @__PURE__ */ React.createElement("div", { className: "upd-title" }, "Update available"), /* @__PURE__ */ React.createElement("div", { className: "upd-ver" }, /* @__PURE__ */ React.createElement("b", null, "v", updateInfo.latest), " ", /* @__PURE__ */ React.createElement("small", null, "\xB7 you have v", updateInfo.current)), /* @__PURE__ */ React.createElement("div", { className: "upd-actions" }, /* @__PURE__ */ React.createElement("button", { className: "upd-btn", disabled: updating, onClick: applyUpdate }, updating ? "Updating\u2026" : "\u2B07 Update now"), updErr ? /* @__PURE__ */ React.createElement("button", { className: "upd-btn ghost", onClick: () => api2.openExternal(updateInfo.url) }, "Open page") : /* @__PURE__ */ React.createElement("button", { className: "upd-btn ghost", disabled: updating, onClick: dismissUpdate }, "Later")), /* @__PURE__ */ React.createElement("div", { className: "upd-foot" + (updErr ? " err" : "") }, updErr || (updating ? "downloading update & restarting\u2026" : "downloads in place & restarts \u2014 no browser needed")))), toast && /* @__PURE__ */ React.createElement("div", { className: "toast" + (toast.err ? " err" : "") }, busy && /* @__PURE__ */ React.createElement("div", { className: "spinner" }), /* @__PURE__ */ React.createElement("span", null, toast.msg)));
   }
   function buildIdMap(tracks) {
     const map = {};
