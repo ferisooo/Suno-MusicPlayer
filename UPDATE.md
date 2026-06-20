@@ -2,6 +2,13 @@
 
 Newest first, grouped by day. Short notes only.
 
+## 2026-06-19 — v1.3.15
+- Fixed: **visualizer no longer freezes at full height during loud passages.** The
+  analyser was clamping every frequency bin to its max (255) when the music got
+  loud, so all bars pegged until the song quieted. Gave the analyser dB headroom
+  and added auto-gain that scales the bars to the current loudness, so they keep
+  their shape and movement even in loud sections.
+
 ## 2026-06-19 — v1.3.14
 - Reverted: the taller "bars rise behind the title" change — bars were going too
   high and covering everything. Back to the original capped height.

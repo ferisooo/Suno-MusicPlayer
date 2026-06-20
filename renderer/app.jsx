@@ -222,6 +222,7 @@ function App() {
       const Ctx = window.AudioContext || window.webkitAudioContext; const ctx = new Ctx();
       const src = ctx.createMediaElementSource(audioRef.current);
       const an = ctx.createAnalyser(); an.fftSize = 1024; an.smoothingTimeConstant = 0.82;
+      an.minDecibels = -85; an.maxDecibels = -12;   // headroom so loud parts don't clamp every bin to 255 (stuck-full bars)
       const eq = settingsRef.current.eq || { low: 0, mid: 0, high: 0 };
       const low = ctx.createBiquadFilter(); low.type = 'lowshelf'; low.frequency.value = 250; low.gain.value = eq.low || 0;
       const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1100; mid.Q.value = 0.9; mid.gain.value = eq.mid || 0;
@@ -243,7 +244,7 @@ function App() {
     const root = document.documentElement;
     const bars = vizRef.current ? vizRef.current.children : [];
     if (!playing) { for (let i = 0; i < bars.length; i++) bars[i].style.height = '8px'; root.style.setProperty('--beat', '0'); return; }
-    let raf, data = null; const FRAME = 1000 / 60; let last = 0;
+    let raf, data = null, agc = 160; const FRAME = 1000 / 60; let last = 0; const peaks = [];
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
       if (document.hidden || now - last < FRAME - 1) return;
@@ -259,13 +260,22 @@ function App() {
       const n = bars.length, bins = data.length;
       const minB = 2, maxB = Math.max(minB + 1, Math.floor(bins * 0.66));   // skip DC + near-silent top
       const ratio = maxB / minB;
+      let frameMax = 0;
       for (let i = 0; i < n; i++) {
         const lo = Math.floor(minB * Math.pow(ratio, i / n));
         let hi = Math.floor(minB * Math.pow(ratio, (i + 1) / n));
         if (hi <= lo) hi = lo + 1;
         let peak = 0;
         for (let j = lo; j < hi && j < bins; j++) if (data[j] > peak) peak = data[j];
-        const v = Math.min(1, (peak / 255) * (1 + (i / n) * 0.65));
+        peaks[i] = peak; if (peak > frameMax) frameMax = peak;
+      }
+      // auto-gain: track the recent loudest band (jumps up instantly, decays slowly)
+      // and scale bars to it — so a loud passage doesn't peg every bar at full; the
+      // bands keep their relative shape instead of flat-lining at the top.
+      agc = Math.max(frameMax, agc * 0.992);
+      const denom = Math.max(95, agc);
+      for (let i = 0; i < n; i++) {
+        const v = Math.min(1, (peaks[i] / denom) * (1 + (i / n) * 0.55));
         bars[i].style.height = (10 + v * span) + 'px';
       }
       // overall beat energy (bass/low-mids carry the pulse) → drives button brightness
