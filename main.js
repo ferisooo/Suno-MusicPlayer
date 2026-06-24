@@ -86,6 +86,7 @@ app.whenReady().then(() => {
   loadState();
   writeObsOverlayHtml();
   writeObsNowPlaying({ title: '', sub: 'Suno AI track', playing: false });
+  startTiktokServer();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
@@ -95,12 +96,44 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
    The app writes the current song to obs/nowplaying.js; overlay.html polls it and
    renders the title + "Suno AI track" on a chroma-green background. In OBS: add a
    Browser source → Local file → overlay.html, then key out the green.            */
+// the latest now-playing payload, shared by the OBS file and the TikTok server
+let nowPlaying = { title: '', sub: 'Suno AI track', playing: false };
 function obsDir() { const d = path.join(app.getPath('userData'), 'obs'); try { fs.mkdirSync(d, { recursive: true }); } catch {} return d; }
 function writeObsNowPlaying(np) { try { fs.writeFileSync(path.join(obsDir(), 'nowplaying.js'), 'window.__NOWPLAYING__ = ' + JSON.stringify(np || {}) + ';'); } catch {} }
 function writeObsOverlayHtml() { try { fs.writeFileSync(path.join(obsDir(), 'overlay.html'), OBS_OVERLAY_HTML); } catch {} }
-ipcMain.handle('obs:update', (_e, np) => { writeObsNowPlaying(np); return true; });
+ipcMain.handle('obs:update', (_e, np) => { nowPlaying = np || nowPlaying; writeObsNowPlaying(np); return true; });
 ipcMain.handle('obs:path', () => path.join(obsDir(), 'overlay.html'));
 ipcMain.handle('obs:open', () => { shell.openPath(obsDir()); return true; });
+
+/* ===================== TikTok now-playing overlay (local HTTP server) =====================
+   TikTok LIVE Studio's "Browser" source asks for a Link (URL), not a local file like OBS, so
+   we serve the same now-playing card over http://127.0.0.1:PORT/. Paste that URL into LIVE
+   Studio → Add → Browser. The background is transparent (LIVE Studio keeps the alpha), so no
+   chroma key is needed. It polls /nowplaying.js once a second and updates live.            */
+let tiktokServer = null;
+let tiktokPort = 0;
+function startTiktokServer() {
+  if (tiktokServer) return;
+  tiktokServer = http.createServer((req, res) => {
+    const route = (req.url || '/').split('?')[0];
+    if (route === '/nowplaying.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+      res.end('window.__NOWPLAYING__ = ' + JSON.stringify(nowPlaying) + ';');
+      return;
+    }
+    if (route === '/' || route === '/overlay.html' || route === '/tiktok.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(TIKTOK_OVERLAY_HTML);
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('not found');
+  });
+  // bind to loopback only; port 0 lets the OS pick a free port
+  tiktokServer.on('error', () => { tiktokServer = null; tiktokPort = 0; });
+  tiktokServer.listen(0, '127.0.0.1', () => { try { tiktokPort = tiktokServer.address().port; } catch { tiktokPort = 0; } });
+}
+ipcMain.handle('tiktok:url', () => (tiktokPort ? 'http://127.0.0.1:' + tiktokPort + '/' : ''));
 
 const OBS_OVERLAY_HTML = `<!doctype html>
 <html>
@@ -153,6 +186,72 @@ const OBS_OVERLAY_HTML = `<!doctype html>
     wrap.classList.add('show');
   }
   // poll via a cache-busted <script> tag so it works from a local file in OBS (no fetch/CORS)
+  function load() {
+    var s = document.createElement('script');
+    s.src = 'nowplaying.js?t=' + Date.now();
+    s.onload = function () { render(window.__NOWPLAYING__); s.remove(); };
+    s.onerror = function () { s.remove(); };
+    document.head.appendChild(s);
+  }
+  setInterval(load, 1000);
+  load();
+</script>
+</body>
+</html>`;
+
+// Same now-playing card as OBS, but on a transparent background so it drops straight
+// onto a TikTok LIVE Studio "Browser" source (no chroma key needed). Served over HTTP.
+const TIKTOK_OVERLAY_HTML = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Suno — Now Playing (TikTok overlay)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Transparent — TikTok LIVE Studio keeps the alpha, so this sits over your video. */
+  html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; font-family: 'Quicksand', system-ui, sans-serif; }
+  #wrap {
+    position: absolute; left: 64px; bottom: 64px; max-width: 84%;
+    opacity: 0; transform: translateY(18px);
+    transition: opacity .45s ease, transform .45s ease;
+  }
+  #wrap.show { opacity: 1; transform: translateY(0); }
+  #title {
+    font-family: 'Fredoka', system-ui, sans-serif; font-weight: 700;
+    font-size: 76px; line-height: 1.04; letter-spacing: .5px;
+    background: linear-gradient(90deg, #ff86b3, #ffce47);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 5px 16px rgba(0,0,0,.55));
+  }
+  #sub {
+    font-family: 'Quicksand', system-ui, sans-serif; font-weight: 600;
+    font-size: 30px; color: #ffffff; margin-top: 12px; letter-spacing: .5px;
+    filter: drop-shadow(0 2px 10px rgba(0,0,0,.7));
+  }
+  #sub .note { color: #ff5d8f; margin-right: 10px; filter: drop-shadow(0 0 8px rgba(255,93,143,.9)); }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="title">—</div>
+    <div id="sub"><span class="note">&#9834;</span><span id="subtext">Suno AI track</span></div>
+  </div>
+<script>
+  var wrap = document.getElementById('wrap');
+  var titleEl = document.getElementById('title');
+  var subEl = document.getElementById('subtext');
+  var lastTitle = null;
+  function render(np) {
+    np = np || {};
+    var t = (np.title || '').trim();
+    if (!t) { wrap.classList.remove('show'); return; }
+    if (t !== lastTitle) { titleEl.textContent = t; lastTitle = t; }
+    subEl.textContent = np.sub || 'Suno AI track';
+    wrap.classList.add('show');
+  }
+  // served over HTTP, so a cache-busted <script> tag is the simplest live poll
   function load() {
     var s = document.createElement('script');
     s.src = 'nowplaying.js?t=' + Date.now();
