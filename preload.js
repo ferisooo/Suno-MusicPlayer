@@ -46,9 +46,6 @@ contextBridge.exposeInMainWorld('kawaii', {
   obsPath: () => ipcRenderer.invoke('obs:path'),
   obsOpen: () => ipcRenderer.invoke('obs:open'),
 
-  // TikTok now-playing overlay (direct URL for LIVE Studio's browser source)
-  tiktokUrl: () => ipcRenderer.invoke('tiktok:url'),
-
   // offline cache
   offlineGet: (id) => ipcRenderer.invoke('offline:get', id),
   offlineSave: (id, bytes) => ipcRenderer.invoke('offline:save', id, bytes),

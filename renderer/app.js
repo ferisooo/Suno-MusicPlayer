@@ -1128,7 +1128,6 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     const [updating, setUpdating] = useState2(false);
     const [updErr, setUpdErr] = useState2("");
     const [obsFile, setObsFile] = useState2("");
-    const [tiktokUrl, setTiktokUrl] = useState2("");
     const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
     const urlCache = useRef(/* @__PURE__ */ new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
     const audioCtxRef = useRef(null), analyserRef = useRef(null), eqRef = useRef(null);
@@ -1177,10 +1176,6 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     }, []);
     useEffect2(() => {
       api2.obsPath && api2.obsPath().then(setObsFile).catch(() => {
-      });
-    }, []);
-    useEffect2(() => {
-      api2.tiktokUrl && api2.tiktokUrl().then(setTiktokUrl).catch(() => {
       });
     }, []);
     useEffect2(() => {
@@ -1772,14 +1767,7 @@ Make sure your DeepSeek API key is set above (\u{1F511}).`);
     } }, "\u{1F4BE} Backup"), /* @__PURE__ */ React.createElement("button", { className: "set-btn", title: "Load songs + playlists from a backup .json (merges \u2014 no duplicates)", onClick: async () => {
       const ok = await api2.importLibrary();
       flash(ok ? "Library restored \u{1F49C}" : "Nothing restored.", !ok);
-    } }, "\u{1F4C2} Restore")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "OBS stream overlay"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, 'green-screen "now playing" (song title + Suno AI track) for OBS')), /* @__PURE__ */ React.createElement("button", { className: "set-btn", title: "Open the folder holding overlay.html", onClick: () => api2.obsOpen() }, "Open folder")), obsFile && /* @__PURE__ */ React.createElement("div", { className: "obs-help" }, "In OBS: ", /* @__PURE__ */ React.createElement("b", null, "\uFF0B Sources \u2192 Browser \u2192 Local file"), " \u2192 pick ", /* @__PURE__ */ React.createElement("code", null, "overlay.html"), " from the folder above, set the size (e.g. 1920\xD71080), then add a ", /* @__PURE__ */ React.createElement("b", null, "Chroma Key"), " filter and remove the green. It updates live as songs change.", /* @__PURE__ */ React.createElement("div", { className: "obs-path" }, obsFile)), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "TikTok stream overlay"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, 'transparent "now playing" for TikTok LIVE Studio — paste this direct URL')), /* @__PURE__ */ React.createElement("button", { className: "set-btn", disabled: !tiktokUrl, title: "Copy the overlay URL to paste into TikTok LIVE Studio", onClick: async () => {
-      try {
-        await navigator.clipboard.writeText(tiktokUrl);
-        flash("Overlay URL copied \u{1F4CB}");
-      } catch {
-        flash("Copy failed — select the URL below.", true);
-      }
-    } }, "\u{1F4CB} Copy URL"), /* @__PURE__ */ React.createElement("button", { className: "set-btn", disabled: !tiktokUrl, title: "Open the overlay in your browser to preview it", onClick: () => api2.openExternal(tiktokUrl) }, "Preview")), tiktokUrl && /* @__PURE__ */ React.createElement("div", { className: "obs-help" }, "In TikTok ", /* @__PURE__ */ React.createElement("b", null, "LIVE Studio"), ": ", /* @__PURE__ */ React.createElement("b", null, "Add → Browser"), ", paste the URL into the ", /* @__PURE__ */ React.createElement("b", null, "Link"), " field, set the size (e.g. 1920\xD71080) and leave the background transparent. It updates live as songs change. (The URL only works while this app is open.)", /* @__PURE__ */ React.createElement("div", { className: "obs-path" }, tiktokUrl)), /* @__PURE__ */ React.createElement("div", { className: "set-eq" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Equalizer"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "shapes the sound (and the visualizer follows it)")), /* @__PURE__ */ React.createElement("div", { className: "eq-presets" }, Object.keys(EQ_PRESETS).map((name) => /* @__PURE__ */ React.createElement("button", { key: name, className: "eq-preset", onClick: () => updateSettings({ eq: EQ_PRESETS[name] }) }, name))), /* @__PURE__ */ React.createElement("div", { className: "eq-bands" }, EQ_BANDS.map(([k, label]) => {
+    } }, "\u{1F4C2} Restore")), /* @__PURE__ */ React.createElement("div", { className: "set-row" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "OBS stream overlay"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, 'green-screen "now playing" (song title + Suno AI track) for OBS')), /* @__PURE__ */ React.createElement("button", { className: "set-btn", title: "Open the folder holding overlay.html", onClick: () => api2.obsOpen() }, "Open folder")), obsFile && /* @__PURE__ */ React.createElement("div", { className: "obs-help" }, "In OBS: ", /* @__PURE__ */ React.createElement("b", null, "\uFF0B Sources \u2192 Browser \u2192 Local file"), " \u2192 pick ", /* @__PURE__ */ React.createElement("code", null, "overlay.html"), " from the folder above, set the size (e.g. 1920\xD71080), then add a ", /* @__PURE__ */ React.createElement("b", null, "Chroma Key"), " filter and remove the green. It updates live as songs change.", /* @__PURE__ */ React.createElement("div", { className: "obs-path" }, obsFile)), /* @__PURE__ */ React.createElement("div", { className: "set-eq" }, /* @__PURE__ */ React.createElement("div", { className: "set-label" }, /* @__PURE__ */ React.createElement("div", { className: "set-title" }, "Equalizer"), /* @__PURE__ */ React.createElement("div", { className: "set-sub" }, "shapes the sound (and the visualizer follows it)")), /* @__PURE__ */ React.createElement("div", { className: "eq-presets" }, Object.keys(EQ_PRESETS).map((name) => /* @__PURE__ */ React.createElement("button", { key: name, className: "eq-preset", onClick: () => updateSettings({ eq: EQ_PRESETS[name] }) }, name))), /* @__PURE__ */ React.createElement("div", { className: "eq-bands" }, EQ_BANDS.map(([k, label]) => {
       const val = (settings.eq || {})[k] || 0;
       return /* @__PURE__ */ React.createElement("div", { key: k, className: "eq-band" }, /* @__PURE__ */ React.createElement("span", { className: "eq-band-label" }, label), /* @__PURE__ */ React.createElement(
         "input",

@@ -130,7 +130,6 @@ function App() {
   const [updating, setUpdating] = useState(false);
   const [updErr, setUpdErr] = useState('');
   const [obsFile, setObsFile] = useState('');
-  const [tiktokUrl, setTiktokUrl] = useState('');
 
   const audioRef = useRef(null), sunoRef = useRef(null), webviewRef = useRef(null);
   const urlCache = useRef(new Map()), vizRef = useRef(null), seekRef = useRef(null), volRef = useRef(null);
@@ -159,9 +158,8 @@ function App() {
   const refreshOffline = async () => { try { const l = api.offlineList && await api.offlineList(); setOfflineCount(Array.isArray(l) ? l.length : 0); } catch {} };
   useEffect(() => { refreshOffline(); }, []);
 
-  /* ---- OBS / TikTok overlays: push the now-playing song to the overlay feed ---- */
+  /* ---- OBS overlay: push the now-playing song to the green-screen overlay file ---- */
   useEffect(() => { api.obsPath && api.obsPath().then(setObsFile).catch(() => {}); }, []);
-  useEffect(() => { api.tiktokUrl && api.tiktokUrl().then(setTiktokUrl).catch(() => {}); }, []);
   useEffect(() => {
     try { api.obsUpdate && api.obsUpdate({ title: current ? current.title : '', sub: 'Suno AI track', playing: !!playing }); } catch {}
   }, [current, playing]);
@@ -667,18 +665,6 @@ function App() {
               <div className="obs-help">
                 In OBS: <b>＋ Sources → Browser → Local file</b> → pick <code>overlay.html</code> from the folder above, set the size (e.g. 1920×1080), then add a <b>Chroma Key</b> filter and remove the green. It updates live as songs change.
                 <div className="obs-path">{obsFile}</div>
-              </div>
-            )}
-            <div className="set-row">
-              <div className="set-label"><div className="set-title">TikTok stream overlay</div><div className="set-sub">transparent "now playing" for TikTok LIVE Studio — paste this direct URL</div></div>
-              <button className="set-btn" disabled={!tiktokUrl} title="Copy the overlay URL to paste into TikTok LIVE Studio"
-                      onClick={async () => { try { await navigator.clipboard.writeText(tiktokUrl); flash('Overlay URL copied 📋'); } catch { flash('Copy failed — select the URL below.', true); } }}>📋 Copy URL</button>
-              <button className="set-btn" disabled={!tiktokUrl} title="Open the overlay in your browser to preview it" onClick={() => api.openExternal(tiktokUrl)}>Preview</button>
-            </div>
-            {tiktokUrl && (
-              <div className="obs-help">
-                In TikTok <b>LIVE Studio</b>: <b>Add → Browser</b>, paste the URL into the <b>Link</b> field, set the size (e.g. 1920×1080) and leave the background transparent. It updates live as songs change. (The URL only works while this app is open.)
-                <div className="obs-path">{tiktokUrl}</div>
               </div>
             )}
             <div className="set-eq">
