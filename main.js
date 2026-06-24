@@ -107,10 +107,11 @@ ipcMain.handle('obs:open', () => { shell.openPath(obsDir()); return true; });
 
 /* ===================== TikTok now-playing overlay (local HTTP server) =====================
    TikTok LIVE Studio's "Browser" source asks for a Link (URL), not a local file like OBS, so
-   we serve the same now-playing card over http://localhost:PORT/. Paste that URL into LIVE
+   we serve the same now-playing card over http://lvh.me:PORT/ (lvh.me resolves to
+   127.0.0.1, so it passes TikTok's domain check). Paste that URL into LIVE
    Studio → Add → Browser. The background is transparent (LIVE Studio keeps the alpha), so no
    chroma key is needed. It polls /nowplaying.js once a second and updates live.            */
-const TIKTOK_PORT = 8787; // fixed so the overlay link is stable: http://localhost:8787/
+const TIKTOK_PORT = 8787; // fixed so the overlay link is stable: http://lvh.me:8787/
 let tiktokServer = null;
 let tiktokPort = 0;
 function tiktokHandler(req, res) {
@@ -138,10 +139,11 @@ function startTiktokServer() {
   };
   listen(TIKTOK_PORT, true);
 }
-// report the hostname form (http://localhost:PORT/) — TikTok LIVE Studio's Link
-// field rejects a bare IP like 127.0.0.1 but accepts "localhost", which still
-// resolves to the loopback server we bind below.
-ipcMain.handle('tiktok:url', () => (tiktokPort ? 'http://localhost:' + tiktokPort + '/' : ''));
+// TikTok LIVE Studio's Link field demands a real domain (its placeholder is
+// "tiktok.com") and rejects both 127.0.0.1 and localhost. lvh.me is a public
+// DNS name that resolves to 127.0.0.1, so http://lvh.me:PORT/ passes the
+// domain check yet still reaches the loopback server we bind below.
+ipcMain.handle('tiktok:url', () => (tiktokPort ? 'http://lvh.me:' + tiktokPort + '/' : ''));
 
 const OBS_OVERLAY_HTML = `<!doctype html>
 <html>
